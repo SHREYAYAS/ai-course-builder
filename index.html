@@ -3,82 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IntelliCourse - AI Learning Platform (Phase 2)</title>
+    <title>IntelliCourse - AI Learning Platform</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #F8F7F4;
-            color: #3F4A42;
-        }
-        .active-lesson {
-            background-color: #EBF2EA !important;
-            border-left-color: #6B8A7A;
-            font-weight: 600;
-        }
-        .paid-lesson {
-            color: #9ca3af;
-        }
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            border-radius: 0.75rem;
-            font-weight: 600;
-            padding: 0.75rem 1.25rem;
-            transition: all 0.2s ease-in-out;
-            border: 1px solid transparent;
-            cursor: pointer;
-        }
-        .btn-primary {
-            background-color: #6B8A7A;
-            color: #FFFFFF;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
-        }
-        .btn-primary:hover:not(:disabled) {
-            background-color: #5A7D6C;
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
-            transform: translateY(-2px);
-        }
-        .btn:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-        }
-        .btn-secondary {
-            background-color: #FFFFFF;
-            color: #5A7D6C;
-            border-color: #D9EAD8;
-        }
-        .btn-secondary:hover:not(:disabled) {
-            background-color: #F0F5F0;
-            border-color: #C8DCC7;
-        }
-        .btn-premium {
-            background: linear-gradient(135deg, #6B8A7A, #8FB09B);
-            color: white;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
-        }
-         .btn-premium:hover {
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
-            transform: translateY(-2px);
-        }
-        .chart-container {
-            position: relative;
-            width: 100%;
-            height: 300px;
-        }
-        @media (min-width: 768px) {
-            .chart-container {
-                height: 350px;
-            }
-        }
-        .custom-shadow {
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body class="antialiased">
 
@@ -86,11 +15,12 @@
         <header class="bg-white/90 backdrop-blur-lg border-b border-gray-200/80 sticky top-0 z-20">
             <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between h-16">
-                    <div class="flex items-center gap-2 cursor-pointer" id="home-logo">
+                    <div class="flex items-center gap-2" id="home-logo">
                          <div class="w-8 h-8 bg-gradient-to-br from-[#6B8A7A] to-[#8FB09B] rounded-lg"></div>
                         <span class="text-2xl font-bold text-[#5A7D6C]">IntelliCourse</span>
                     </div>
                     <div class="flex items-center gap-4">
+                        <span id="user-status-text" class="text-sm font-medium text-gray-500 hidden">Welcome, Learner!</span>
                         <button id="dashboard-btn" class="btn btn-secondary">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg>
                             <span>My Dashboard</span>
@@ -126,18 +56,21 @@
             <div id="view-course" class="hidden">
                 <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     <div class="lg:grid lg:grid-cols-12 lg:gap-8">
+                        
                         <aside class="lg:col-span-3 mb-8 lg:mb-0">
                            <div class="sticky top-24 bg-white p-4 rounded-2xl custom-shadow border">
                                 <h2 id="course-title-sidebar" class="text-xl font-bold mb-2"></h2>
-                                <p id="course-progress-text" class="text-sm text-gray-600 mb-2"></p>
+                                <p id="course-progress-text" class="text-sm text-gray-600 mb-2">0% Complete</p>
                                 <div class="w-full bg-gray-200 rounded-full h-2.5 mb-4">
                                     <div id="course-progress-bar" class="bg-gradient-to-r from-[#6B8A7A] to-[#8FB09B] h-2.5 rounded-full transition-all duration-500"></div>
                                 </div>
                                 <div id="syllabus-container" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2"></div>
                            </div>
                         </aside>
+
                         <div class="lg:col-span-6">
                             <div class="aspect-w-16 aspect-h-9 mb-4 bg-gray-900 rounded-2xl shadow-2xl shadow-gray-400/30 overflow-hidden" id="video-container">
+                                <!-- Video Player/Upgrade message will be injected here by JS -->
                             </div>
                             <div class="flex justify-between items-start">
                                 <h1 id="lesson-title" class="text-3xl font-bold mb-4 flex-1"></h1>
@@ -146,17 +79,19 @@
                                     <span>Mark as Complete</span>
                                 </button>
                             </div>
+                            
                             <div class="mt-4">
                                 <div class="border-b border-gray-200">
                                     <nav class="-mb-px flex space-x-6" aria-label="Tabs">
-                                        <button id="tab-notes" class="whitespace-nowrap pb-3 px-1 border-b-2 font-semibold text-sm">AI Notes</button>
-                                        <button id="tab-projects" class="whitespace-nowrap pb-3 px-1 border-b-2 font-semibold text-sm">Project Ideas</button>
+                                        <button id="tab-notes" class="whitespace-nowrap pb-3 px-1 border-b-2 font-semibold text-sm text-[#5A7D6C] border-[#6B8A7A]">AI Notes</button>
+                                        <button id="tab-projects" class="whitespace-nowrap pb-3 px-1 border-b-2 font-semibold text-sm text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300">Project Ideas</button>
                                     </nav>
                                 </div>
                                 <div id="content-notes" class="py-6 prose max-w-none prose-headings:text-[#3F4A42] prose-strong:text-[#3F4A42]"></div>
                                 <div id="content-projects" class="py-6 hidden prose max-w-none prose-headings:text-[#3F4A42]"></div>
                             </div>
                         </div>
+                        
                         <aside class="lg:col-span-3 mt-8 lg:mt-0">
                             <div class="sticky top-24 space-y-6">
                                <div class="bg-white p-4 rounded-2xl custom-shadow border">
@@ -196,21 +131,27 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                         <div class="bg-white p-6 rounded-2xl custom-shadow border flex items-center gap-4">
-                            <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-green-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg></div>
+                            <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-green-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                            </div>
                             <div>
                                 <p class="text-gray-500">Courses in Progress</p>
                                 <p class="text-2xl font-bold" id="stat-courses">0</p>
                             </div>
                         </div>
                          <div class="bg-white p-6 rounded-2xl custom-shadow border flex items-center gap-4">
-                            <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+                            <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            </div>
                             <div>
                                 <p class="text-gray-500">Lessons Completed</p>
                                 <p class="text-2xl font-bold" id="stat-lessons">0</p>
                             </div>
                         </div>
                         <div class="bg-white p-6 rounded-2xl custom-shadow border flex items-center gap-4">
-                            <div class="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.657 7.343A8 8 0 0117.657 18.657z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 16.571L12 14M12 14l2.5 2.571M12 14v2.571" /></svg></div>
+                            <div class="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.657 7.343A8 8 0 0117.657 18.657z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 16.571L12 14M12 14l2.5 2.571M12 14v2.571" /></svg>
+                            </div>
                             <div>
                                 <p class="text-gray-500">Current Streak</p>
                                 <p class="text-2xl font-bold" id="stat-streak">0 🔥</p>
@@ -227,6 +168,7 @@
                     
                     <h2 class="text-2xl font-bold mb-4">My Courses</h2>
                     <div id="dashboard-courses-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- Course cards will be injected by JS -->
                     </div>
                 </div>
             </div>
@@ -240,341 +182,6 @@
         </footer>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-
-            // --- MOCK DATA ---
-            const mockCourseData = {
-                id: 'python-ai-101',
-                title: 'Learn Python with AI',
-                modules: [
-                    {
-                        title: 'Module 1: Python Fundamentals',
-                        lessons: [
-                            { id: 'p1', title: 'Introduction to Python', videoId: 'kqtD5dpn9C8', completed: true, type: 'free', notes: '<h3>What is Python?</h3><p>Python is a high-level, interpreted programming language known for its simple syntax and readability. It\'s widely used in web development, data science, AI, and more.</p><h4>Key Features:</h4><ul><li>Easy to learn</li><li>Large standard library</li><li>Dynamically typed</li></ul>' },
-                            { id: 'p2', title: 'Variables and Data Types', videoId: 'g2gZz-w_j1s', completed: true, type: 'free', notes: '<h3>Variables</h3><p>Variables are containers for storing data values. In Python, you don\'t need to declare the type of a variable.</p>' },
-                            { id: 'p3', title: 'Lists, Tuples, and Dictionaries', videoId: 'R-HLU9A_g_4', completed: false, type: 'paid', notes: '<h3>Advanced Collections</h3><p>This premium lesson covers advanced usage of collections, including list comprehensions and dictionary methods.</p>' }
-                        ]
-                    },
-                    {
-                        title: 'Module 2: Control Flow & Functions',
-                        lessons: [
-                            { id: 'p4', title: 'Conditional Statements (if/else)', videoId: 'DZwmZ8Usvnk', completed: false, type: 'free', notes: '<h3>Making Decisions</h3><p>Conditional statements allow you to execute code blocks based on certain conditions.</p>' },
-                            { id: 'p5', title: 'Loops (for/while)', videoId: 'OnDr4J2qL0g', completed: false, type: 'paid', notes: '<h3>Mastering Loops</h3><p>Go beyond the basics with nested loops, break/continue statements, and the else clause in loops.</p>' }
-                        ]
-                    }
-                ],
-                projectIdeas: '<h3>Project 1: Personal Blog Aggregator (Free)</h3><p>Create a web application that scrapes and displays recent posts from a list of your favorite blogs.</p><hr class="my-4"><h3>Project 2: Sentiment Analysis Tool (Premium)</h3><p>Build a tool that analyzes the sentiment of a piece of text.</p>'
-            };
-            
-            const mockUserData = {
-                isPremium: false,
-                streak: 12,
-                savedCourses: [mockCourseData, {
-                    id: 'js-webdev-101',
-                    title: 'JavaScript for Web Development',
-                    modules: [{ title: 'Module 1: JS Basics', lessons: [{id: 'j1', title: 'Intro', videoId: 'hdI2bqOjy3c', completed: true, type: 'free'}]}],
-                    projectIdeas: '<p>Build an interactive To-Do list application.</p>'
-                }],
-                activity: [5, 3, 6, 4, 7, 2, 5] 
-            };
-
-            // --- PHASE 2: STATE MANAGEMENT ---
-            // This object holds the current state of the application.
-            const appState = {
-                currentView: 'generator',
-                currentCourse: null, // Will hold a deep copy of the course being viewed
-                userData: JSON.parse(JSON.stringify(mockUserData)), // Deep copy to allow modifications
-                timer: {
-                    intervalId: null,
-                    timeLeft: 25 * 60,
-                    isRunning: false,
-                }
-            };
-            
-            // --- DOM ELEMENT REFERENCES ---
-            const views = {
-                generator: document.getElementById('view-generator'),
-                course: document.getElementById('view-course'),
-                dashboard: document.getElementById('view-dashboard')
-            };
-            const tabButtons = {
-                notes: document.getElementById('tab-notes'),
-                projects: document.getElementById('tab-projects')
-            };
-            const contentPanes = {
-                notes: document.getElementById('content-notes'),
-                projects: document.getElementById('content-projects')
-            };
-
-            // --- PHASE 2: CORE INTERACTIVITY FUNCTIONS ---
-
-            const switchView = (viewName) => {
-                appState.currentView = viewName;
-                Object.values(views).forEach(v => v.classList.add('hidden'));
-                if (views[viewName]) {
-                    views[viewName].classList.remove('hidden');
-                }
-            };
-            
-            const switchTab = (tabName) => {
-                 Object.values(tabButtons).forEach(b => {
-                    b.classList.remove('text-[#5A7D6C]', 'border-[#6B8A7A]');
-                    b.classList.add('text-gray-500', 'border-transparent');
-                });
-                Object.values(contentPanes).forEach(p => p.classList.add('hidden'));
-
-                tabButtons[tabName].classList.add('text-[#5A7D6C]', 'border-[#6B8A7A]');
-                tabButtons[tabName].classList.remove('text-gray-500', 'border-transparent');
-                contentPanes[tabName].classList.remove('hidden');
-            };
-
-            const renderSyllabus = (course) => {
-                const container = document.getElementById('syllabus-container');
-                container.innerHTML = '';
-                course.modules.forEach((module, moduleIndex) => {
-                    const moduleEl = document.createElement('div');
-                    const lessonsHtml = module.lessons.map((lesson, lessonIndex) => {
-                        const isPaidAndLocked = lesson.type === 'paid' && !appState.userData.isPremium;
-                        const icon = isPaidAndLocked 
-                            ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" /></svg>`
-                            : `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>`;
-                        
-                        return `
-                            <li data-module-index="${moduleIndex}" data-lesson-index="${lessonIndex}" class="lesson-item cursor-pointer p-3 rounded-xl border-l-4 ${lesson.completed ? 'border-green-300' : 'border-transparent'} hover:bg-gray-100 flex items-center gap-3 ${isPaidAndLocked ? 'paid-lesson' : ''}">
-                                ${icon}
-                                <span class="flex-grow text-sm font-medium">${lesson.title}</span>
-                                ${lesson.completed ? '<span class="text-green-500">✔</span>' : ''}
-                            </li>
-                        `;
-                    }).join('');
-
-                    moduleEl.innerHTML = `
-                        <h3 class="font-bold text-md mb-2 px-2">${module.title}</h3>
-                        <ul class="space-y-1">${lessonsHtml}</ul>
-                    `;
-                    container.appendChild(moduleEl);
-                });
-            };
-
-            const updateCourseProgress = (course) => {
-                const allLessons = course.modules.flatMap(m => m.lessons);
-                const completedLessons = allLessons.filter(l => l.completed).length;
-                const totalLessons = allLessons.length;
-                const progress = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
-                
-                document.getElementById('course-progress-bar').style.width = `${progress}%`;
-                document.getElementById('course-progress-text').textContent = `${Math.round(progress)}% Complete (${completedLessons}/${totalLessons} lessons)`;
-            };
-
-            const loadLesson = (moduleIndex, lessonIndex) => {
-                const lesson = appState.currentCourse.modules[moduleIndex].lessons[lessonIndex];
-                const videoContainer = document.getElementById('video-container');
-                const contentNotes = document.getElementById('content-notes');
-                const markCompleteBtn = document.getElementById('mark-complete-btn');
-
-                document.getElementById('lesson-title').textContent = lesson.title;
-
-                if (lesson.type === 'paid' && !appState.userData.isPremium) {
-                    videoContainer.innerHTML = `
-                        <div class="text-center p-8 bg-gray-50 rounded-lg w-full h-full flex flex-col justify-center items-center">
-                            <span class="text-4xl">🔒</span>
-                            <h3 class="text-xl font-bold mt-4">This is a Premium Lesson</h3>
-                            <p class="text-gray-600 mt-2 max-w-sm">Upgrade to IntelliCourse Premium to unlock this lesson, advanced project ideas, and more.</p>
-                            <button class="mt-4 btn btn-premium">Upgrade Now</button>
-                        </div>
-                    `;
-                    contentNotes.innerHTML = '';
-                    markCompleteBtn.style.display = 'none';
-                } else {
-                    videoContainer.innerHTML = `<iframe class="w-full h-full" src="https://www.youtube.com/embed/${lesson.videoId}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
-                    contentNotes.innerHTML = lesson.notes;
-                    markCompleteBtn.style.display = 'inline-flex';
-                    markCompleteBtn.querySelector('span').textContent = lesson.completed ? 'Completed' : 'Mark as Complete';
-                    markCompleteBtn.disabled = lesson.completed;
-                }
-                
-                appState.currentCourse.activeLesson = { moduleIndex, lessonIndex };
-
-                document.querySelectorAll('.lesson-item').forEach(el => el.classList.remove('active-lesson'));
-                const activeLessonEl = document.querySelector(`.lesson-item[data-module-index="${moduleIndex}"][data-lesson-index="${lessonIndex}"]`);
-                if(activeLessonEl) activeLessonEl.classList.add('active-lesson');
-            };
-
-            const loadCourse = (course) => {
-                appState.currentCourse = JSON.parse(JSON.stringify(course)); 
-                document.getElementById('course-title-sidebar').textContent = appState.currentCourse.title;
-                renderSyllabus(appState.currentCourse);
-                updateCourseProgress(appState.currentCourse);
-                loadLesson(0, 0); // Load the very first lesson
-                switchView('course');
-                switchTab('notes');
-            };
-
-            const renderDashboard = () => {
-                const grid = document.getElementById('dashboard-courses-grid');
-                grid.innerHTML = '';
-                
-                const totalLessonsCompleted = appState.userData.savedCourses.reduce((acc, course) => {
-                    return acc + course.modules.flatMap(m => m.lessons).filter(l => l.completed).length;
-                }, 0);
-
-                document.getElementById('stat-courses').textContent = appState.userData.savedCourses.length;
-                document.getElementById('stat-lessons').textContent = totalLessonsCompleted;
-                document.getElementById('stat-streak').textContent = `${appState.userData.streak} 🔥`;
-
-                appState.userData.savedCourses.forEach(course => {
-                    const card = document.createElement('div');
-                    card.className = 'bg-white rounded-2xl custom-shadow border hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex flex-col';
-                    card.dataset.courseId = course.id;
-
-                    const allLessons = course.modules.flatMap(m => m.lessons);
-                    const completedLessons = allLessons.filter(l => l.completed).length;
-                    const progress = allLessons.length > 0 ? Math.round((completedLessons / allLessons.length) * 100) : 0;
-
-                    card.innerHTML = `
-                        <div class="h-32 bg-gradient-to-br from-[#6B8A7A] to-[#8FB09B] rounded-t-2xl"></div>
-                        <div class="p-4 flex flex-col flex-grow">
-                            <h3 class="font-bold text-lg mb-2 flex-grow">${course.title}</h3>
-                            <p class="text-sm text-gray-500 mb-3">${allLessons.length} lessons</p>
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-gradient-to-r from-[#6B8A7A] to-[#8FB09B] h-2 rounded-full" style="width: ${progress}%"></div>
-                            </div>
-                            <p class="text-xs text-gray-500 mt-1 self-end">${progress}% Complete</p>
-                        </div>
-                    `;
-                    grid.appendChild(card);
-                });
-                renderActivityChart();
-            };
-            
-            let activityChartInstance = null;
-            const renderActivityChart = () => {
-                const ctx = document.getElementById('activityChart').getContext('2d');
-                if (activityChartInstance) { activityChartInstance.destroy(); }
-                activityChartInstance = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: ['6 days ago', '5 days ago', '4 days ago', '3 days ago', '2 days ago', 'Yesterday', 'Today'],
-                        datasets: [{
-                            label: 'Lessons Completed',
-                            data: appState.userData.activity,
-                            backgroundColor: '#8FB09B',
-                            hoverBackgroundColor: '#6B8A7A',
-                            borderRadius: 6,
-                            borderWidth: 0,
-                            barThickness: 20,
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { beginAtZero: true, grid: { drawBorder: false }, ticks: { stepSize: 2, color: '#9ca3af' }},
-                            x: { grid: { display: false }, ticks: { color: '#9ca3af' }}
-                        }
-                    }
-                });
-            };
-
-            const updateTimerDisplay = () => {
-                const minutes = Math.floor(appState.timer.timeLeft / 60).toString().padStart(2, '0');
-                const seconds = (appState.timer.timeLeft % 60).toString().padStart(2, '0');
-                document.getElementById('timer-display').textContent = `${minutes}:${seconds}`;
-            };
-            
-            const startTimer = () => {
-                if(appState.timer.isRunning) return;
-                appState.timer.isRunning = true;
-                appState.timer.intervalId = setInterval(() => {
-                    appState.timer.timeLeft--;
-                    updateTimerDisplay();
-                    if(appState.timer.timeLeft <= 0) {
-                        clearInterval(appState.timer.intervalId);
-                        appState.timer.isRunning = false;
-                        resetTimer();
-                    }
-                }, 1000);
-            };
-
-            const pauseTimer = () => {
-                clearInterval(appState.timer.intervalId);
-                appState.timer.isRunning = false;
-            };
-
-            const resetTimer = () => {
-                clearInterval(appState.timer.intervalId);
-                appState.timer.isRunning = false;
-                appState.timer.timeLeft = 25 * 60;
-                updateTimerDisplay();
-            };
-
-            // --- PHASE 2: EVENT LISTENERS ---
-            
-            document.getElementById('home-logo').addEventListener('click', () => {
-                switchView('generator');
-            });
-            
-            document.getElementById('dashboard-btn').addEventListener('click', () => {
-                renderDashboard();
-                switchView('dashboard');
-            });
-
-            document.getElementById('create-new-course-btn').addEventListener('click', () => {
-                switchView('generator');
-            });
-
-            document.getElementById('generate-course-btn').addEventListener('click', () => {
-                if(document.getElementById('topic-input').value.trim() === '') return;
-                document.getElementById('loading-indicator').classList.remove('hidden');
-                setTimeout(() => {
-                    document.getElementById('loading-indicator').classList.add('hidden');
-                    loadCourse(mockCourseData);
-                }, 1500);
-            });
-
-            document.getElementById('syllabus-container').addEventListener('click', (e) => {
-                const lessonItem = e.target.closest('.lesson-item');
-                if (lessonItem) {
-                    const moduleIndex = parseInt(lessonItem.dataset.moduleIndex);
-                    const lessonIndex = parseInt(lessonItem.dataset.lessonIndex);
-                    loadLesson(moduleIndex, lessonIndex);
-                }
-            });
-            
-            document.getElementById('dashboard-courses-grid').addEventListener('click', (e) => {
-                const card = e.target.closest('[data-course-id]');
-                if(card) {
-                    const course = appState.userData.savedCourses.find(c => c.id === card.dataset.courseId);
-                    if(course) loadCourse(course);
-                }
-            });
-
-            document.getElementById('mark-complete-btn').addEventListener('click', (e) => {
-                const { moduleIndex, lessonIndex } = appState.currentCourse.activeLesson;
-                const lesson = appState.currentCourse.modules[moduleIndex].lessons[lessonIndex];
-                if (!lesson.completed) {
-                    lesson.completed = true;
-                    // In a real app, we'd also update this in userData.savedCourses
-                    renderSyllabus(appState.currentCourse);
-                    updateCourseProgress(appState.currentCourse);
-                    loadLesson(moduleIndex, lessonIndex); // Reload to update button state
-                }
-            });
-            
-            tabButtons.notes.addEventListener('click', () => switchTab('notes'));
-            tabButtons.projects.addEventListener('click', () => switchTab('projects'));
-            
-            document.getElementById('timer-start').addEventListener('click', startTimer);
-            document.getElementById('timer-pause').addEventListener('click', pauseTimer);
-            document.getElementById('timer-reset').addEventListener('click', resetTimer);
-            
-            // --- INITIALIZATION ---
-            document.getElementById('streak-counter').textContent = appState.userData.streak;
-            console.log("Phase 2 Initialized: Application is now interactive.");
-
-        });
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
