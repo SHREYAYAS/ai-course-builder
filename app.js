@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- PHASE 1: MOCK DATA & APP STATE ---
+    // --- PHASE 1 & 3: APP STATE (MOCK DATA REMOVED) ---
 
     const appState = {
         currentView: 'generator',
@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
         user: {
             isPremium: false,
             streak: 12,
-            savedCourses: [],
+            savedCourses: [], // This will now be populated by API calls
             activity: [5, 3, 6, 4, 7, 2, 5] 
         },
         timer: {
@@ -17,39 +17,10 @@ document.addEventListener('DOMContentLoaded', () => {
             isRunning: false,
         }
     };
-
-    const mockCourseData = {
-        id: 'python-ai-101',
-        title: 'Learn Python with AI',
-        modules: [
-            {
-                title: 'Module 1: Python Fundamentals',
-                lessons: [
-                    { id: 'p1', title: 'Introduction to Python', videoId: 'kqtD5dpn9C8', completed: true, type: 'free', notes: '<h3>What is Python?</h3><p>Python is a high-level, interpreted programming language known for its simple syntax and readability. It\'s widely used in web development, data science, AI, and more.</p><h4>Key Features:</h4><ul><li>Easy to learn</li><li>Large standard library</li><li>Dynamically typed</li></ul>' },
-                    { id: 'p2', title: 'Variables and Data Types', videoId: 'g2gZz-w_j1s', completed: true, type: 'free', notes: '<h3>Variables</h3><p>Variables are containers for storing data values. In Python, you don\'t need to declare the type of a variable.</p><h4>Common Data Types:</h4><ul><li><b>int:</b> Integer numbers (e.g., 5, -10)</li><li><b>float:</b> Floating-point numbers (e.g., 3.14)</li><li><b>str:</b> Strings (e.g., "Hello")</li><li><b>bool:</b> Boolean values (True, False)</li></ul><pre><code>name = "Alice"\nage = 30\npi = 3.14159</code></pre>' },
-                    { id: 'p3', title: 'Lists, Tuples, and Dictionaries', videoId: 'R-HLU9A_g_4', completed: false, type: 'paid', notes: '<h3>Advanced Collections</h3><p>This premium lesson covers advanced usage of collections, including list comprehensions and dictionary methods.</p><h4>Exclusive Content:</h4><ul><li>Performance comparisons</li><li>Advanced code snippets</li><li>Expert Q&A section</li></ul>' }
-                ]
-            },
-            {
-                title: 'Module 2: Control Flow & Functions',
-                lessons: [
-                    { id: 'p4', title: 'Conditional Statements (if/else)', videoId: 'DZwmZ8Usvnk', completed: false, type: 'free', notes: '<h3>Making Decisions</h3><p>Conditional statements allow you to execute code blocks based on certain conditions.</p><pre><code>age = 18\nif age >= 18:\n  print("You are an adult.")\nelse:\n  print("You are a minor.")</code></pre>' },
-                    { id: 'p5', title: 'Loops (for/while)', videoId: 'OnDr4J2qL0g', completed: false, type: 'paid', notes: '<h3>Mastering Loops</h3><p>Go beyond the basics with nested loops, break/continue statements, and the else clause in loops.</p><h4>Exclusive Content:</h4><ul><li>Complex looping patterns</li><li>Common pitfalls to avoid</li><li>Downloadable cheat sheet</li></ul>' }
-                ]
-            }
-        ],
-        projectIdeas: '<h3>Project 1: Personal Blog Aggregator (Free)</h3><p>Create a web application that scrapes and displays recent posts from a list of your favorite blogs. Use Python with libraries like BeautifulSoup for scraping and Flask for the web backend.</p><hr class="my-4"><h3>Project 2: Sentiment Analysis Tool (Premium)</h3><p>Build a tool that analyzes the sentiment (positive, negative, neutral) of a piece of text. You can use a pre-trained AI model from libraries like NLTK or TextBlob. Premium includes a starter code repository.</p>'
-    };
     
-    appState.user.savedCourses.push(mockCourseData);
-    appState.user.savedCourses.push({
-        id: 'js-webdev-101',
-        title: 'JavaScript for Web Development',
-        modules: [{ title: 'Module 1: JS Basics', lessons: [{id: 'j1', title: 'Intro', videoId: 'hdI2bqOjy3c', completed: true, type: 'free'}]}],
-        projectIdeas: '<p>Build an interactive To-Do list application.</p>'
-    });
+    // MOCK DATABASE HAS BEEN MOVED TO server.js
 
-    // --- PHASE 2: DOM ELEMENT REFERENCES ---
+    // --- PHASE 2: DOM ELEMENT REFERENCES (No Changes) ---
 
     const views = {
         generator: document.getElementById('view-generator'),
@@ -69,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const userStatusText = document.getElementById('user-status-text');
 
-    // --- PHASE 2: CORE FUNCTIONS ---
+    // --- PHASE 2: CORE FUNCTIONS (No Changes) ---
 
     const switchView = (viewName) => {
         appState.currentView = viewName;
@@ -167,6 +138,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadCourse = (course) => {
         appState.currentCourse = JSON.parse(JSON.stringify(course)); 
+        // Add course to saved courses if it's not already there
+        if (!appState.user.savedCourses.find(c => c.id === course.id)) {
+            appState.user.savedCourses.push(appState.currentCourse);
+        }
         document.getElementById('course-title-sidebar').textContent = appState.currentCourse.title;
         renderSyllabus(appState.currentCourse);
         updateCourseProgress(appState.currentCourse);
@@ -179,6 +154,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderDashboard = () => {
         const grid = document.getElementById('dashboard-courses-grid');
         grid.innerHTML = '';
+        
+        if (appState.user.savedCourses.length === 0) {
+            grid.innerHTML = `<p class="text-gray-500 md:col-span-3 text-center">You haven't generated any courses yet. Go create one!</p>`;
+        }
         
         const totalLessonsCompleted = appState.user.savedCourses.reduce((acc, course) => {
             return acc + course.modules.flatMap(m => m.lessons).filter(l => l.completed).length;
@@ -280,7 +259,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if(appState.timer.timeLeft <= 0) {
                 clearInterval(appState.timer.intervalId);
                 appState.timer.isRunning = false;
-                // Replace alert with a more subtle notification if possible in a real app
                 console.log("Time's up! Take a break.");
                 resetTimer();
             }
@@ -299,22 +277,48 @@ document.addEventListener('DOMContentLoaded', () => {
         updateTimerDisplay();
     };
 
-    // --- PHASE 2: EVENT LISTENERS ---
+    // --- PHASE 3: EVENT LISTENERS (Updated) ---
 
     document.getElementById('home-logo').addEventListener('click', () => {
         switchView('generator');
     });
 
-    document.getElementById('generate-course-btn').addEventListener('click', () => {
-        if(document.getElementById('topic-input').value.trim() === '') {
-             document.getElementById('topic-input').focus();
+    document.getElementById('generate-course-btn').addEventListener('click', async () => {
+        const topicInput = document.getElementById('topic-input');
+        const topic = topicInput.value.trim();
+
+        if (topic === '') {
+             topicInput.focus();
             return;
         }
-        document.getElementById('loading-indicator').classList.remove('hidden');
-        setTimeout(() => {
-            document.getElementById('loading-indicator').classList.add('hidden');
-            loadCourse(mockCourseData);
-        }, 1500);
+
+        const loadingIndicator = document.getElementById('loading-indicator');
+        loadingIndicator.classList.remove('hidden');
+
+        try {
+            // Use the 'fetch' API to send a POST request to our new backend
+            const response = await fetch('http://localhost:3000/generate-course', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ topic: topic }), // Send the topic in the request body
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const courseData = await response.json(); // Get the course data from the server's response
+            loadCourse(courseData);
+
+        } catch (error) {
+            console.error("Could not fetch course:", error);
+            alert("Failed to generate course. Is the backend server running?");
+        } finally {
+            // Always hide the loading indicator
+            loadingIndicator.classList.add('hidden');
+        }
     });
 
     document.getElementById('dashboard-btn').addEventListener('click', () => {
@@ -354,7 +358,6 @@ document.addEventListener('DOMContentLoaded', () => {
             renderSyllabus(appState.currentCourse);
             updateCourseProgress(appState.currentCourse);
             
-            // Re-highlight the active lesson after re-render
             const activeLessonEl = document.querySelector(`.lesson-item[data-module-index="${moduleIndex}"][data-lesson-index="${lessonIndex}"]`);
             if(activeLessonEl) activeLessonEl.classList.add('active-lesson');
         }
