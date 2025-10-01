@@ -2,6 +2,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- PHASE 1 & 3: APP STATE (MOCK DATA REMOVED) ---
 
+    // If user opens index.html directly (file://), fallback to localhost API
+    const API_BASE = location.protocol === 'file:' ? 'http://localhost:3000' : '';
+
     const appState = {
         currentView: 'generator',
         currentCourse: null,
@@ -121,7 +124,17 @@ document.addEventListener('DOMContentLoaded', () => {
             contentNotes.innerHTML = '';
             markCompleteBtn.style.display = 'none';
         } else {
-            videoContainer.innerHTML = `<iframe id="video-player" class="w-full h-full" src="https://www.youtube.com/embed/${lesson.videoId}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+            if (lesson.videoId && lesson.videoId !== 'null') {
+                videoContainer.innerHTML = `<iframe id="video-player" class="w-full h-full" src="https://www.youtube.com/embed/${lesson.videoId}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+            } else {
+                videoContainer.innerHTML = `
+                    <div class="w-full h-full flex items-center justify-center bg-gray-50 text-gray-600">
+                        <div class="text-center p-6">
+                            <div class="text-4xl mb-2">🎬</div>
+                            <p>No video found for this lesson. You can still read the notes below.</p>
+                        </div>
+                    </div>`;
+            }
             contentNotes.innerHTML = lesson.notes;
             markCompleteBtn.style.display = 'inline-flex';
             markCompleteBtn.querySelector('span').textContent = lesson.completed ? 'Completed' : 'Mark as Complete';
@@ -318,7 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
         switchView('generator');
     });
 
-    document.getElementById('generate-course-btn').addEventListener('click', async () => {
+    document.getElementById('generate-course-btn').addEventListener('click', async (e) => {
         const topicInput = document.getElementById('topic-input');
         const topic = topicInput.value.trim();
 
@@ -328,11 +341,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const loadingIndicator = document.getElementById('loading-indicator');
+        const btn = e.currentTarget;
+        btn.disabled = true;
         loadingIndicator.classList.remove('hidden');
 
         try {
             // Use the 'fetch' API to send a POST request to our new backend
-            const response = await fetch('http://localhost:3000/generate-course', {
+            const response = await fetch(`${API_BASE}/api/generate-course`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -349,10 +364,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error("Could not fetch course:", error);
-            alert("Failed to generate course. Is the backend server running?");
+            const hint = location.protocol === 'file:'
+                ? 'Open http://localhost:3000 instead of the file path so the API is reachable.'
+                : 'Make sure the server is running in the terminal (npm start).';
+            alert(`Failed to generate course. ${hint}`);
         } finally {
             // Always hide the loading indicator
             loadingIndicator.classList.add('hidden');
+            btn.disabled = false;
         }
     });
 
