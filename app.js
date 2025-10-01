@@ -1,9 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- PHASE 1 & 3: APP STATE (MOCK DATA REMOVED) ---
+<<<<<<< HEAD
 
     // If user opens index.html directly (file://), fallback to localhost API
     const API_BASE = location.protocol === 'file:' ? 'http://localhost:3000' : '';
+=======
+>>>>>>> daa0e4c3a794a2c03f3dabec7a2276bf87c10910
 
     const appState = {
         currentView: 'generator',
@@ -296,7 +299,11 @@ document.addEventListener('DOMContentLoaded', () => {
         switchView('generator');
     });
 
+<<<<<<< HEAD
     document.getElementById('generate-course-btn').addEventListener('click', async (e) => {
+=======
+    document.getElementById('generate-course-btn').addEventListener('click', async () => {
+>>>>>>> daa0e4c3a794a2c03f3dabec7a2276bf87c10910
         const topicInput = document.getElementById('topic-input');
         const topic = topicInput.value.trim();
 
@@ -306,13 +313,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const loadingIndicator = document.getElementById('loading-indicator');
+<<<<<<< HEAD
         const btn = e.currentTarget;
         btn.disabled = true;
+=======
+>>>>>>> daa0e4c3a794a2c03f3dabec7a2276bf87c10910
         loadingIndicator.classList.remove('hidden');
 
         try {
             // Use the 'fetch' API to send a POST request to our new backend
+<<<<<<< HEAD
             const response = await fetch(`${API_BASE}/api/generate-course`, {
+=======
+            const response = await fetch('http://localhost:3000/generate-course', {
+>>>>>>> daa0e4c3a794a2c03f3dabec7a2276bf87c10910
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -329,6 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error("Could not fetch course:", error);
+<<<<<<< HEAD
             const hint = location.protocol === 'file:'
                 ? 'Open http://localhost:3000 instead of the file path so the API is reachable.'
                 : 'Make sure the server is running in the terminal (npm start).';
@@ -337,6 +352,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Always hide the loading indicator
             loadingIndicator.classList.add('hidden');
             btn.disabled = false;
+=======
+            alert("Failed to generate course. Is the backend server running?");
+        } finally {
+            // Always hide the loading indicator
+            loadingIndicator.classList.add('hidden');
+>>>>>>> daa0e4c3a794a2c03f3dabec7a2276bf87c10910
         }
     });
 

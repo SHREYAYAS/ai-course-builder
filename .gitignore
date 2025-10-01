@@ -8,3 +8,8 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+# Ignore Node.js dependencies
+node_modules
+
+# Ignore environment variables file
+.env
