@@ -6,6 +6,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Compute API base so it works when opening index.html directly (file://)
     const API_BASE = location.protocol === 'file:' ? 'http://localhost:3000' : '';
 
+    // Quick backend ping to help users see if server is up
+    (async () => {
+        try {
+            const r = await fetch(`${API_BASE}/health`, { cache: 'no-store' });
+            if (!r.ok) throw new Error(`Health status ${r.status}`);
+            const j = await r.json();
+            console.log('Backend health:', j);
+        } catch (e) {
+            console.warn('Backend not reachable at', `${API_BASE}/health`);
+        }
+    })();
+
     // --- 1. FIREBASE INITIALIZATION ---
     // Guard: if Firebase scripts aren’t loaded, continue without auth
     let db = null;
@@ -170,12 +182,22 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingIndicator.classList.remove('hidden');
 
         try {
-            const response = await fetch(`${API_BASE}/generate-course`, {
+            let response = await fetch(`${API_BASE}/generate-course`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 // Send topic and userId when available
                 body: JSON.stringify({ topic: topic, userId: appState.userId || null }),
             });
+
+            // Fallback: some versions/routes used /api/generate-course
+            if (!response.ok) {
+                console.warn('Primary endpoint failed', response.status);
+                response = await fetch(`${API_BASE}/api/generate-course`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topic: topic, userId: appState.userId || null }),
+                });
+            }
 
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             
@@ -188,6 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error("Could not generate course:", error);
+            console.error('Hint: ensure the backend is running (npm start) and open http://localhost:3000, not the file path.');
             alert("Failed to generate course. Please check that your backend and AI services are running correctly.");
         } finally {
             loadingIndicator.classList.add('hidden');

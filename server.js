@@ -19,7 +19,14 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+const corsOptions = {
+  origin: true, // reflect request origin (including file:// as 'null')
+  credentials: false,
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+// Handle CORS preflight for all routes (needed for POST with JSON from file://)
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 // Serve static front-end files (index.html etc.)
 app.use(express.static(path.join(__dirname)));
