@@ -1,20 +1,18 @@
 {
   "name": "ai-course-builder",
-  "version": "1.0.0",
-  "description": "A web application that generates personalized learning courses using AI.",
+  "version": "0.1.0",
+  "description": "An AI-powered course generation platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "keywords": [
-    "ai",
-    "course-builder",
-    "e-learning"
-  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/generative-ai": "^0.19.0",
     "cors": "^2.8.5",
-    "express": "^4.18.2"
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
   }
 }
+

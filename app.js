@@ -279,6 +279,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- PHASE 3: EVENT LISTENERS (Updated) ---
 
+    document.getElementById('edit-video-btn').addEventListener('click', () => {
+    if (!appState.currentCourse || appState.currentCourse.activeLesson === null) return;
+
+    const { moduleIndex, lessonIndex } = appState.currentCourse.activeLesson;
+    const lesson = appState.currentCourse.modules[moduleIndex].lessons[lessonIndex];
+
+    const newVideoUrl = prompt("Please enter the new YouTube video URL or ID:", `https://www.youtube.com/watch?v=${lesson.videoId}`);
+
+    if (newVideoUrl) {
+        let newVideoId = '';
+        try {
+            if (newVideoUrl.includes('v=')) {
+                newVideoId = new URL(newVideoUrl).searchParams.get('v');
+            } else if (newVideoUrl.includes('youtu.be/')) {
+                newVideoId = new URL(newVideoUrl).pathname.slice(1);
+            } else if (newVideoUrl.trim().length === 11) {
+                newVideoId = newVideoUrl.trim();
+            }
+
+            if (newVideoId && newVideoId.length === 11) {
+                lesson.videoId = newVideoId;
+                loadLesson(appState.currentCourse, moduleIndex, lessonIndex);
+                const savedCourse = appState.user.savedCourses.find(c => c.id === appState.currentCourse.id);
+                if(savedCourse) {
+                    savedCourse.modules[moduleIndex].lessons[lessonIndex].videoId = newVideoId;
+                }
+            } else {
+                alert("Invalid YouTube URL or ID. Please try again.");
+            }
+        } catch (error) {
+             alert("Could not parse the YouTube URL. Please check the format.");
+        }
+    }
+});
+
     document.getElementById('home-logo').addEventListener('click', () => {
         switchView('generator');
     });
