@@ -210,9 +210,13 @@ async function generateCourseWithAI(topic) {
         // Clean to ensure valid JSON
         const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
-    const courseData = JSON.parse(cleanedText);
-    // Optionally replace/verify videoIds with real YouTube results
-    return await enrichCourseWithYouTube(courseData, topic);
+        const courseData = JSON.parse(cleanedText);
+        // Guarantee an id so the frontend can reference this course
+        if (!courseData.id) {
+            courseData.id = `course-${Date.now()}`;
+        }
+        // Optionally replace/verify videoIds with real YouTube results
+        return await enrichCourseWithYouTube(courseData, topic);
 
     } catch (error) {
         console.error('Error communicating with Gemini:', error?.status || '', error?.statusText || '', String(error));
