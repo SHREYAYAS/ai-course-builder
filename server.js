@@ -16,13 +16,15 @@ try {
     path.join(__dirname, 'serviceAccountKey.json.json'),
     process.env.FIREBASE_SERVICE_ACCOUNT || '',
   ].filter(Boolean);
+  // Support inline JSON via env
+  let serviceAccount = null;
   const saPath = saPathCandidates.find(p => {
     try { return fs.existsSync(p); } catch { return false; }
   });
   if (saPath) {
     // Lazy require to avoid error if package not installed
     const adminLib = require('firebase-admin');
-    const serviceAccount = require(saPath);
+    serviceAccount = require(saPath);
     admin = adminLib;
     if (!admin.apps?.length) {
       admin.initializeApp({
@@ -32,7 +34,20 @@ try {
     firestore = admin.firestore();
     console.log('[Firestore] Admin initialized using', path.basename(saPath));
   } else {
+    // Try FIREBASE_SERVICE_ACCOUNT_JSON (raw JSON), or FIREBASE_SERVICE_ACCOUNT_B64 (base64 JSON)
+    const rawJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || (process.env.FIREBASE_SERVICE_ACCOUNT_B64 ? Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_B64, 'base64').toString('utf8') : null);
+    if (rawJson) {
+      const adminLib = require('firebase-admin');
+      serviceAccount = JSON.parse(rawJson);
+      admin = adminLib;
+      if (!admin.apps?.length) {
+        admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+      }
+      firestore = admin.firestore();
+      console.log('[Firestore] Admin initialized from env JSON');
+    } else {
     console.warn('[Firestore] Service account key not found. Server-side saves will be skipped.');
+    }
   }
 } catch (e) {
   console.warn('[Firestore] Admin init failed:', e?.message || e);
@@ -52,7 +67,13 @@ const port = process.env.PORT || 3000;
 
 // Middleware
 const corsOptions = {
-  origin: true, // reflect request origin (including file:// as 'null')
+  origin: (origin, cb) => {
+    const allowList = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (!origin || origin === 'null' || allowList.length === 0 || allowList.includes(origin)) {
+      return cb(null, true);
+    }
+    return cb(new Error('Not allowed by CORS'));
+  },
   credentials: false,
   optionsSuccessStatus: 204,
 };

@@ -10,8 +10,8 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const API_KEY = process.env.GEMINI_API_KEY;
 const MODEL_OVERRIDE = process.env.GEMINI_MODEL; // optional manual override
 const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
-// YouTube Data API key (optional but recommended)
-const YT_API_KEY = process.env.YT_API_KEY;
+// YouTube Data API key (optional but recommended) - support both env names
+const YT_API_KEY = process.env.YT_API_KEY || process.env.YOUTUBE_API_KEY;
 
 // --- YouTube helpers ---
 async function fetchYouTubeVideoId(searchQuery) {
