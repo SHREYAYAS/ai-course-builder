@@ -8,6 +8,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <!-- Inline favicon to avoid 404 requests for /favicon.ico -->
+    <link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="%236B8A7A"/></svg>'>
     <!-- Firebase (compat) scripts for app.js Firestore/Auth code -->
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
@@ -134,10 +136,13 @@
             <!-- VIEW: Dashboard -->
             <div id="view-dashboard" class="hidden">
                 <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
-                         <h1 class="text-3xl font-bold">My Dashboard</h1>
-                         <button id="create-new-course-btn" class="btn btn-primary">Create New Course</button>
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
+                    <h1 class="text-3xl font-bold">My Dashboard</h1>
+                    <div class="flex items-center gap-3">
+                       <button id="resume-btn" class="btn btn-secondary hidden">Resume Learning</button>
+                       <button id="create-new-course-btn" class="btn btn-primary">Create New Course</button>
                     </div>
+                </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                         <div class="bg-white p-6 rounded-2xl custom-shadow border flex items-center gap-4">

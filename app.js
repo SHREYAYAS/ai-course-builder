@@ -35,6 +35,22 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             firebase.initializeApp(firebaseConfig);
             db = firebase.firestore();
+            // Networking resilience: avoid QUIC issues and use long-polling when needed
+            try {
+                db.settings({ experimentalAutoDetectLongPolling: true, useFetchStreams: false });
+            } catch (e) {
+                console.warn('Firestore settings apply failed (non-fatal):', e);
+            }
+            // Offline cache so data survives refresh even with flaky network
+            try {
+                if (firebase.firestore && typeof firebase.firestore().enablePersistence === 'function') {
+                    firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch((err) => {
+                        console.warn('Firestore persistence not enabled:', err && err.code || err);
+                    });
+                }
+            } catch (e) {
+                console.warn('Firestore persistence apply failed:', e);
+            }
             auth = firebase.auth();
         } else {
             console.warn('Firebase scripts not found. Proceeding without auth/Firestore.');
@@ -55,11 +71,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // LocalStorage helpers (fallback persistence when no auth/DB)
+    const LS_KEYS = {
+        lastCourse: 'intelli:lastCourse',
+        lastUserId: 'intelli:lastUserId'
+    };
+    const saveToLocal = (key, value) => {
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+    };
+    const loadFromLocal = (key) => {
+        try {
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : null;
+        } catch (_) { return null; }
+    };
+
     const views = {
         generator: document.getElementById('view-generator'),
         course: document.getElementById('view-course'),
         dashboard: document.getElementById('view-dashboard')
     };
+    const resumeBtn = document.getElementById('resume-btn');
     
     const tabButtons = {
         notes: document.getElementById('tab-notes'),
@@ -70,6 +102,20 @@ document.addEventListener('DOMContentLoaded', () => {
         projects: document.getElementById('content-projects')
     };
     const userStatusText = document.getElementById('user-status-text');
+    function formatRelativeTime(ts) {
+        if (!ts) return 'just now';
+        const diff = Date.now() - ts;
+        const sec = Math.floor(diff / 1000);
+        if (sec < 60) return 'just now';
+        const min = Math.floor(sec / 60);
+        if (min < 60) return `${min} min${min>1?'s':''} ago`;
+        const hr = Math.floor(min / 60);
+        if (hr < 24) return `${hr} hour${hr>1?'s':''} ago`;
+        const day = Math.floor(hr / 24);
+        if (day < 7) return `${day} day${day>1?'s':''} ago`;
+        const date = new Date(ts);
+        return date.toLocaleDateString();
+    }
 
 
     // --- 3. AUTHENTICATION ---
@@ -81,6 +127,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("User signed in with ID:", appState.userId);
                 switchView('dashboard');
                 renderDashboard();
+                // Clear any anonymous local userId mismatch
+                saveToLocal(LS_KEYS.lastUserId, appState.userId);
+                // If there is a locally saved course, open it immediately as a resume fallback
+                const localCourse = loadFromLocal(LS_KEYS.lastCourse);
+                if (localCourse) {
+                    loadCourse(localCourse);
+                }
             } else {
                 auth.signInAnonymously().catch(error => {
                     console.error("Anonymous sign-in failed:", error);
@@ -90,6 +143,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         // No auth available; stay in generator view and allow generating without a userId
         switchView('generator');
+        // Try restore last course if any
+        const localCourse = loadFromLocal(LS_KEYS.lastCourse);
+        if (localCourse) {
+            loadCourse(localCourse);
+        }
     }
 
 
@@ -102,16 +160,31 @@ document.addEventListener('DOMContentLoaded', () => {
             views[viewName].classList.remove('hidden');
         }
         userStatusText.classList.toggle('hidden', appState.userId === null || viewName === 'generator');
+        updateResumeButton();
     };
+
+    function updateResumeButton() {
+        if (!resumeBtn) return;
+        const localCourse = loadFromLocal(LS_KEYS.lastCourse);
+        const canResume = !!(appState.currentCourse || localCourse);
+        resumeBtn.classList.toggle('hidden', !canResume);
+    }
 
     const loadCourse = (course) => {
         appState.currentCourse = course; 
         document.getElementById('course-title-sidebar').textContent = appState.currentCourse.title;
         renderSyllabus(appState.currentCourse);
         updateCourseProgress(appState.currentCourse);
-        loadLesson(appState.currentCourse, 0, 0);
+        // Auto-open last active lesson if available, else first
+        const ai = course?.activeLesson;
+        const mIndex = (ai && Number.isInteger(ai.moduleIndex)) ? ai.moduleIndex : 0;
+        const lIndex = (ai && Number.isInteger(ai.lessonIndex)) ? ai.lessonIndex : 0;
+        loadLesson(appState.currentCourse, mIndex, lIndex);
         switchView('course');
         switchTab('notes');
+        // Fallback persist
+        saveToLocal(LS_KEYS.lastCourse, appState.currentCourse);
+        updateResumeButton();
     };
     
     const renderDashboard = () => {
@@ -128,6 +201,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 courses.push({ id: doc.id, ...doc.data() });
             });
 
+            // Sort by updatedAt desc, fallback to createdAt desc
+            courses.sort((a, b) => {
+                const ta = Date.parse(a.updatedAt || a.createdAt || 0) || 0;
+                const tb = Date.parse(b.updatedAt || b.createdAt || 0) || 0;
+                return tb - ta;
+            });
+
             grid.innerHTML = ''; 
 
             if (courses.length === 0) {
@@ -138,33 +218,86 @@ document.addEventListener('DOMContentLoaded', () => {
                     card.className = 'bg-white rounded-2xl custom-shadow border hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex flex-col';
                     card.dataset.courseId = course.id;
 
-                    const allLessons = course.modules.flatMap(m => m.lessons);
+                    const allLessons = (course.modules || []).flatMap(m => m.lessons || []);
                     const completedLessons = allLessons.filter(l => l.completed).length;
                     const progress = allLessons.length > 0 ? Math.round((completedLessons / allLessons.length) * 100) : 0;
+                    const ts = Date.parse(course.updatedAt || course.createdAt || 0) || 0;
+                    const rel = formatRelativeTime(ts);
+                    const notStarted = completedLessons === 0;
+                    const done = allLessons.length > 0 && completedLessons === allLessons.length;
+                    const statusColor = done ? 'bg-green-500' : (notStarted ? 'bg-gray-300' : 'bg-amber-400');
+                    const al = course.activeLesson;
+                    let continueText = '';
+                    if (al && Number.isInteger(al.moduleIndex) && Number.isInteger(al.lessonIndex)) {
+                        const m = course.modules?.[al.moduleIndex];
+                        const l = m?.lessons?.[al.lessonIndex];
+                        const label = l?.title || `Module ${al.moduleIndex + 1} • Lesson ${al.lessonIndex + 1}`;
+                        continueText = `Continue: ${label}`;
+                    }
 
                     card.innerHTML = `
                         <div class="h-32 bg-gradient-to-br from-[#6B8A7A] to-[#8FB09B] rounded-t-2xl"></div>
                         <div class="p-4 flex flex-col flex-grow">
-                            <h3 class="font-bold text-lg mb-2 flex-grow">${course.title}</h3>
-                            <p class="text-sm text-gray-500 mb-3">${allLessons.length} lessons</p>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="inline-block w-2.5 h-2.5 rounded-full ${statusColor}"></span>
+                                <h3 class="font-bold text-lg flex-grow">${course.title}</h3>
+                            </div>
+                            <p class="text-sm text-gray-500">${allLessons.length} lessons</p>
+                            ${continueText ? `<p class=\"text-xs text-gray-600 mt-0.5\">${continueText}</p>` : ''}
+                            <p class="text-xs text-gray-400 mb-2">Last opened ${rel}</p>
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div class="bg-gradient-to-r from-[#6B8A7A] to-[#8FB09B] h-2 rounded-full" style="width: ${progress}%"></div>
                             </div>
                             <p class="text-xs text-gray-500 mt-1 self-end">${progress}% Complete</p>
+                            <button class="resume-course-btn btn btn-secondary mt-3 w-fit">Resume</button>
                         </div>
                     `;
                     grid.appendChild(card);
                 });
             }
+
+            // Update simple stats: total courses and lessons completed
+            try {
+                const allLessons = courses.flatMap(c => (c.modules || []).flatMap(m => m.lessons || []));
+                const completedLessons = allLessons.filter(l => l && l.completed).length;
+                document.getElementById('stat-courses').textContent = String(courses.length);
+                document.getElementById('stat-lessons').textContent = String(completedLessons);
+            } catch (_) { /* non-fatal */ }
         }, error => {
             console.error("Error fetching courses: ", error);
-            grid.innerHTML = `<p class="text-red-500 md:col-span-3 text-center">Could not load courses. Please check your connection and Firestore security rules.</p>`;
+            // Local resume fallback
+            const localCourse = loadFromLocal(LS_KEYS.lastCourse);
+            if (localCourse) {
+                grid.innerHTML = '';
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-2xl custom-shadow border hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex flex-col';
+                card.dataset.courseId = localCourse.id || 'local';
+                const allLessons = (localCourse.modules || []).flatMap(m => m.lessons || []);
+                const completedLessons = allLessons.filter(l => l.completed).length;
+                const progress = allLessons.length ? Math.round((completedLessons / allLessons.length) * 100) : 0;
+                card.innerHTML = `
+                    <div class="h-32 bg-gradient-to-br from-[#6B8A7A] to-[#8FB09B] rounded-t-2xl"></div>
+                    <div class="p-4 flex flex-col flex-grow">
+                        <h3 class="font-bold text-lg mb-2 flex-grow">${localCourse.title || 'Resume Last Course'}</h3>
+                        <p class="text-sm text-gray-500 mb-3">${allLessons.length} lessons</p>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-gradient-to-r from-[#6B8A7A] to-[#8FB09B] h-2 rounded-full" style="width: ${progress}%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1 self-end">${progress}% Complete</p>
+                    </div>`;
+                card.addEventListener('click', () => loadCourse(localCourse));
+                grid.appendChild(card);
+                // Update stats from local snapshot
+                try {
+                    document.getElementById('stat-courses').textContent = '1';
+                    document.getElementById('stat-lessons').textContent = String(completedLessons);
+                } catch (_) {}
+            } else {
+                grid.innerHTML = `<p class="text-red-500 md:col-span-3 text-center">Could not load courses. Please check your connection and Firestore security rules.</p>`;
+            }
         });
         
-        // Stats will be updated via a separate listener later for more complex scenarios
-        document.getElementById('stat-courses').textContent = '...';
-        document.getElementById('stat-lessons').textContent = '...';
-        document.getElementById('stat-streak').textContent = '... 🔥';
+        // Stats will be updated by the snapshot listener above
     };
 
 
@@ -202,11 +335,25 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             
             const courseData = await response.json();
-            
-            // The server now saves the course to Firestore.
-            // We just need to load the course data the server sends back.
-            console.log("Received course from server with ID:", courseData.id);
+            console.log("Received course from server with ID:", courseData.id, 'saved:', courseData.saved);
+
+            // Client-side fallback save if server couldn't save (e.g., no admin key) and we have userId
+            if (!courseData.saved && appState.userId && db) {
+                try {
+                    await db.collection('users').doc(appState.userId).collection('courses').doc(String(courseData.id)).set({
+                        ...courseData,
+                        ownerId: appState.userId,
+                        createdAt: courseData.createdAt || new Date().toISOString(),
+                    }, { merge: true });
+                    console.log('Saved course to Firestore (client-side).');
+                } catch (e) {
+                    console.warn('Client Firestore save failed:', e);
+                }
+            }
+
             loadCourse(courseData);
+            // Always save to local as a fallback snapshot
+            saveToLocal(LS_KEYS.lastCourse, courseData);
 
         } catch (error) {
             console.error("Could not generate course:", error);
@@ -218,12 +365,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('dashboard-courses-grid').addEventListener('click', async (e) => {
+        // Handle per-card Resume button
+        const resumeEl = e.target.closest('.resume-course-btn');
+        if (resumeEl) {
+            e.preventDefault();
+            e.stopPropagation();
+            const card = resumeEl.closest('[data-course-id]');
+            if (card && appState.userId) {
+                const courseId = card.dataset.courseId;
+                const courseDoc = await db.collection('users').doc(appState.userId).collection('courses').doc(courseId).get();
+                if (courseDoc.exists) {
+                    loadCourse({ id: courseDoc.id, ...courseDoc.data() });
+                    saveToLocal(LS_KEYS.lastCourse, { id: courseDoc.id, ...courseDoc.data() });
+                }
+            }
+            return;
+        }
         const card = e.target.closest('[data-course-id]');
         if(card && appState.userId) {
             const courseId = card.dataset.courseId;
             const courseDoc = await db.collection('users').doc(appState.userId).collection('courses').doc(courseId).get();
             if (courseDoc.exists) {
                 loadCourse({ id: courseDoc.id, ...courseDoc.data() });
+                saveToLocal(LS_KEYS.lastCourse, { id: courseDoc.id, ...courseDoc.data() });
             } else {
                 console.error("Could not find the clicked course in the database.");
             }
@@ -231,37 +395,65 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('mark-complete-btn').addEventListener('click', async (e) => {
-        if (!appState.currentCourse || !appState.userId) return;
+        if (!appState.currentCourse || !appState.currentCourse.activeLesson) return;
 
         const { moduleIndex, lessonIndex } = appState.currentCourse.activeLesson;
-        const courseRef = db.collection('users').doc(appState.userId).collection('courses').doc(appState.currentCourse.id);
-        
+        // Optimistic UI update
+        const lesson = appState.currentCourse.modules?.[moduleIndex]?.lessons?.[lessonIndex];
+    if (!lesson) return;
+    const nextState = !lesson.completed;
+    lesson.completed = nextState;
+    renderSyllabus(appState.currentCourse);
+    updateCourseProgress(appState.currentCourse);
+    // Save snapshot to local
+    saveToLocal(LS_KEYS.lastCourse, appState.currentCourse);
+    e.currentTarget.querySelector('span').textContent = nextState ? 'Completed' : 'Mark as Complete';
+    e.currentTarget.disabled = false;
+
+        // Try server update first (preferred)
         try {
-            const courseDoc = await courseRef.get();
-            if (courseDoc.exists) {
-                const courseData = courseDoc.data();
-                const lesson = courseData.modules[moduleIndex].lessons[lessonIndex];
-                
-                if (!lesson.completed) {
-                    lesson.completed = true;
-                    await courseRef.set(courseData);
-                    
-                    appState.currentCourse = courseData; // Update local state
-                    renderSyllabus(appState.currentCourse);
-                    updateCourseProgress(appState.currentCourse);
-                    e.currentTarget.querySelector('span').textContent = 'Completed';
-                    e.currentTarget.disabled = true;
+            if (appState.userId) {
+                const resp = await fetch(`${API_BASE}/courses/${encodeURIComponent(appState.currentCourse.id)}/complete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: appState.userId,
+                        moduleIndex,
+                        lessonIndex,
+                        completed: nextState,
+                    }),
+                });
+                if (resp.ok) {
+                    const j = await resp.json();
+                    if (j?.course) {
+                        appState.currentCourse = j.course;
+                        saveToLocal(LS_KEYS.lastCourse, appState.currentCourse);
+                    }
+                    return;
                 }
             }
-        } catch (error) {
-            console.error("Error updating lesson status:", error);
-            alert("Could not update lesson status. Please try again.");
+            // Client-side fallback if server not available
+            if (db && appState.userId) {
+                const ref = db.collection('users').doc(appState.userId).collection('courses').doc(String(appState.currentCourse.id));
+                const updatedAt = new Date().toISOString();
+                appState.currentCourse.updatedAt = updatedAt;
+                await ref.set({ ...appState.currentCourse, updatedAt }, { merge: true });
+            }
+        } catch (err) {
+            console.warn('Lesson complete persist failed:', err);
         }
     });
 
     // --- Event Listeners ---
     document.getElementById('home-logo').addEventListener('click', () => switchView('generator'));
     document.getElementById('dashboard-btn').addEventListener('click', () => { switchView('dashboard'); });
+    if (resumeBtn) {
+        resumeBtn.addEventListener('click', () => {
+            const localCourse = loadFromLocal(LS_KEYS.lastCourse);
+            const course = appState.currentCourse || localCourse;
+            if (course) loadCourse(course);
+        });
+    }
     document.getElementById('create-new-course-btn').addEventListener('click', () => switchView('generator'));
     tabButtons.notes.addEventListener('click', () => switchTab('notes'));
     tabButtons.projects.addEventListener('click', () => switchTab('projects'));
@@ -344,10 +536,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
         }
         contentNotes.innerHTML = lesson.notes || '';
-        markCompleteBtn.style.display = 'inline-flex';
-        markCompleteBtn.querySelector('span').textContent = lesson.completed ? 'Completed' : 'Mark as Complete';
-        markCompleteBtn.disabled = !!lesson.completed;
+    markCompleteBtn.style.display = 'inline-flex';
+    markCompleteBtn.querySelector('span').textContent = lesson.completed ? 'Completed' : 'Mark as Complete';
+    // Keep enabled to allow toggling on/off
+    markCompleteBtn.disabled = false;
         course.activeLesson = { moduleIndex, lessonIndex };
+        // Persist last active lesson to Firestore (best-effort)
+        if (db && appState.userId && course.id) {
+            try {
+                const ref = db.collection('users').doc(appState.userId).collection('courses').doc(String(course.id));
+                const updatedAt = new Date().toISOString();
+                course.updatedAt = updatedAt;
+                ref.set({ activeLesson: { moduleIndex, lessonIndex }, updatedAt }, { merge: true });
+            } catch (e) {
+                console.warn('Failed to save activeLesson:', e);
+            }
+        }
+        // Also persist to local snapshot
+        saveToLocal(LS_KEYS.lastCourse, course);
         document.querySelectorAll('.lesson-item').forEach(el => el.classList.remove('active-lesson'));
         const activeLessonEl = document.querySelector(`.lesson-item[data-module-index="${moduleIndex}"][data-lesson-index="${lessonIndex}"]`);
         if (activeLessonEl) activeLessonEl.classList.add('active-lesson');
