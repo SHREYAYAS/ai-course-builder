@@ -59,6 +59,7 @@ const {
   listAvailableModelsRest,
   testModelName,
   getSelectedModel,
+  getYouTubeStatus,
 } = require('./ai-service');
 
 // Create app
@@ -93,11 +94,13 @@ app.get('/', (_req, res) => {
 app.get('/health', (_req, res) => {
   const hasKey = !!process.env.GEMINI_API_KEY;
   const hasYT = !!process.env.YT_API_KEY;
+  const yt = (getYouTubeStatus && getYouTubeStatus()) || {};
   res.json({
     status: 'ok',
     aiKeyLoaded: hasKey,
     youtubeKeyLoaded: hasYT,
     selectedModel: getSelectedModel && getSelectedModel(),
+    youtube: yt,
   });
 });
 

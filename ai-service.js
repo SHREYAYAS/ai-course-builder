@@ -12,10 +12,21 @@ const MODEL_OVERRIDE = process.env.GEMINI_MODEL; // optional manual override
 const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 // YouTube Data API key (optional but recommended) - support both env names
 const YT_API_KEY = process.env.YT_API_KEY || process.env.YOUTUBE_API_KEY;
+// Allow disabling enrichment in production if quota is tight
+const YT_ENRICH = String(process.env.YT_ENRICH || 'true').toLowerCase() !== 'false';
+
+// Simple in-memory cache and quota backoff flag
+const ytCache = new Map(); // key: query -> videoId|null
+let ytQuotaBackoffUntil = 0; // epoch ms until which we skip calls
 
 // --- YouTube helpers ---
+function isValidVideoId(id) {
+    return typeof id === 'string' && /^[\w-]{11}$/.test(id);
+}
+
 async function fetchYouTubeVideoId(searchQuery) {
     if (!YT_API_KEY) return null;
+    if (Date.now() < ytQuotaBackoffUntil) return null;
     const params = new URLSearchParams({
         part: 'snippet',
         q: searchQuery,
@@ -31,8 +42,20 @@ async function fetchYouTubeVideoId(searchQuery) {
     const url = `https://www.googleapis.com/youtube/v3/search?${params.toString()}`;
     const res = await fetch(url);
     if (!res.ok) {
-        const msg = await res.text().catch(() => res.statusText);
-        console.warn('YouTube API error:', res.status, msg);
+        let msgText = res.statusText;
+        try {
+            const j = await res.json();
+            msgText = JSON.stringify(j);
+            // Detect quota exceeded and back off for 1 hour
+            const reason = j?.error?.errors?.[0]?.reason || j?.error?.errors?.[0]?.message || '';
+            if (res.status === 403 && /quota/i.test(JSON.stringify(j))) {
+                ytQuotaBackoffUntil = Date.now() + 60 * 60 * 1000; // 1 hour backoff
+                console.warn('YouTube quota exceeded. Disabling enrichment for 1 hour.');
+            }
+        } catch (_) {
+            try { msgText = await res.text(); } catch(_) {}
+        }
+        console.warn('YouTube API error:', res.status, msgText);
         return null;
     }
     const data = await res.json();
@@ -41,29 +64,29 @@ async function fetchYouTubeVideoId(searchQuery) {
 }
 
 async function enrichCourseWithYouTube(course, topic) {
-    if (!YT_API_KEY) return course; // nothing to do
-    const cache = new Map();
-    const tasks = [];
+    if (!YT_ENRICH || !YT_API_KEY) return course; // disabled or no key
+    if (Date.now() < ytQuotaBackoffUntil) return course; // backoff in effect
+    // Sequential (low-concurrency) to avoid quota spikes
     for (const module of course.modules || []) {
         for (const lesson of module.lessons || []) {
+            // Skip if AI already provided a valid videoId
+            if (isValidVideoId(lesson.videoId)) continue;
             const q = `${topic} ${lesson.title} tutorial`;
-            if (cache.has(q)) {
-                const cached = cache.get(q);
+            if (ytCache.has(q)) {
+                const cached = ytCache.get(q);
                 if (cached) lesson.videoId = cached;
                 continue;
             }
-            tasks.push((async () => {
-                try {
-                    const vid = await fetchYouTubeVideoId(q);
-                    cache.set(q, vid);
-                    if (vid) lesson.videoId = vid;
-                } catch (e) {
-                    console.warn('YT fetch failed for', q, e?.message || e);
-                }
-            })());
+            try {
+                const vid = await fetchYouTubeVideoId(q);
+                ytCache.set(q, vid);
+                if (vid) lesson.videoId = vid;
+                if (Date.now() < ytQuotaBackoffUntil) return course; // stop early if quota hit
+            } catch (e) {
+                console.warn('YT fetch failed for', q, e?.message || e);
+            }
         }
     }
-    await Promise.all(tasks);
     return course;
 }
 
@@ -286,5 +309,14 @@ module.exports = { generateCourseWithAI, listAvailableModelsRest, testModelName 
 // Helper for diagnostics
 module.exports.getSelectedModel = function getSelectedModel() {
     return (MODEL_OVERRIDE && MODEL_OVERRIDE.trim()) || lastWorkingModel || null;
+};
+
+// Expose YouTube enrichment status for diagnostics/clients
+module.exports.getYouTubeStatus = function getYouTubeStatus() {
+    return {
+        hasApiKey: !!YT_API_KEY,
+        enrichEnabled: !!YT_ENRICH,
+        backoffUntil: ytQuotaBackoffUntil || 0,
+    };
 };
 

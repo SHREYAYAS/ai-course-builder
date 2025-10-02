@@ -13,6 +13,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!r.ok) throw new Error(`Health status ${r.status}`);
             const j = await r.json();
             console.log('Backend health:', j);
+            // Update YouTube banner if enrichment is disabled or in backoff
+            try {
+                const banner = document.getElementById('yt-banner');
+                const yt = j.youtube || {};
+                const backoffActive = yt.backoffUntil && Date.now() < yt.backoffUntil;
+                if (banner && (!yt.enrichEnabled || backoffActive)) {
+                    const when = backoffActive ? ` until ${new Date(yt.backoffUntil).toLocaleTimeString()}` : '';
+                    banner.textContent = 'Some lessons may not include videos right now due to YouTube API limits' + when + '.';
+                    banner.classList.remove('hidden');
+                }
+            } catch (_) {}
         } catch (e) {
             console.warn('Backend not reachable at', `${API_BASE}/health`);
         }
@@ -74,7 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // LocalStorage helpers (fallback persistence when no auth/DB)
     const LS_KEYS = {
         lastCourse: 'intelli:lastCourse',
-        lastUserId: 'intelli:lastUserId'
+        lastUserId: 'intelli:lastUserId',
+        timer: 'intelli:timer',
+        streak: 'intelli:streak'
     };
     const saveToLocal = (key, value) => {
         try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
@@ -134,6 +147,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (localCourse) {
                     loadCourse(localCourse);
                 }
+                // Load streak and timer state
+                loadStreak();
+                restoreTimerState();
             } else {
                 auth.signInAnonymously().catch(error => {
                     console.error("Anonymous sign-in failed:", error);
@@ -148,6 +164,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (localCourse) {
             loadCourse(localCourse);
         }
+        // Load timer/streak from local when offline
+        loadStreak();
+        restoreTimerState();
     }
 
 
@@ -558,13 +577,153 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeLessonEl = document.querySelector(`.lesson-item[data-module-index="${moduleIndex}"][data-lesson-index="${lessonIndex}"]`);
         if (activeLessonEl) activeLessonEl.classList.add('active-lesson');
         document.getElementById('content-projects').innerHTML = course.projectIdeas || '';
+        // Track learning activity for streaks
+        try { bumpStreak(); } catch (_) {}
     }
 
-    // Timer helpers (minimal)
-    function updateTimerDisplay() { /* noop */ }
-    function startTimer() { /* noop */ }
-    function pauseTimer() { /* noop */ }
-    function resetTimer() { /* noop */ }
+    // --- Productivity Tools ---
+    // Focus Timer (Pomodoro-like)
+    const WORK_DURATION = 25 * 60; // seconds
+    const BREAK_DURATION = 5 * 60;
+    appState.timer.mode = appState.timer.mode || 'work';
+    const timerDisplayEl = document.getElementById('timer-display');
+    const startBtn = document.getElementById('timer-start');
+    const pauseBtn = document.getElementById('timer-pause');
+    const resetBtn = document.getElementById('timer-reset');
+
+    function formatTime(sec) {
+        const m = Math.floor(sec / 60).toString().padStart(2, '0');
+        const s = Math.floor(sec % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    }
+
+    function saveTimerState() {
+        saveToLocal(LS_KEYS.timer, {
+            mode: appState.timer.mode,
+            timeLeft: appState.timer.timeLeft,
+            isRunning: appState.timer.isRunning,
+            ts: Date.now(),
+        });
+    }
+
+    function restoreTimerState() {
+        const saved = loadFromLocal(LS_KEYS.timer);
+                if (resp.ok) {
+            appState.timer.mode = 'work';
+            appState.timer.timeLeft = WORK_DURATION;
+            appState.timer.isRunning = false;
+            updateTimerDisplay();
+            return;
+                    try { bumpStreak(); } catch (_) {}
+        }
+        // Basic restore without drift correction for simplicity
+        appState.timer.mode = saved.mode || 'work';
+        appState.timer.timeLeft = typeof saved.timeLeft === 'number' ? saved.timeLeft : (saved.mode === 'break' ? BREAK_DURATION : WORK_DURATION);
+        appState.timer.isRunning = false; // always start paused on restore for safety
+        updateTimerDisplay();
+    }
+
+    function updateTimerDisplay() {
+        const sec = Math.max(0, appState.timer.timeLeft);
+            try { bumpStreak(); } catch (_) {}
+        if (timerDisplayEl) timerDisplayEl.textContent = formatTime(sec);
+        // Update button states
+        if (startBtn) startBtn.disabled = appState.timer.isRunning;
+        if (pauseBtn) pauseBtn.disabled = !appState.timer.isRunning;
+        if (resetBtn) resetBtn.disabled = false;
+    }
+
+    function tick() {
+        if (!appState.timer.isRunning) return;
+        appState.timer.timeLeft -= 1;
+        if (appState.timer.timeLeft <= 0) {
+            // Auto-switch modes
+            appState.timer.mode = appState.timer.mode === 'work' ? 'break' : 'work';
+            appState.timer.timeLeft = appState.timer.mode === 'work' ? WORK_DURATION : BREAK_DURATION;
+            // Simple feedback
+            try { window.navigator.vibrate && window.navigator.vibrate(200); } catch (_) {}
+        }
+        updateTimerDisplay();
+        saveTimerState();
+    }
+
+    function startTimer() {
+        if (appState.timer.isRunning) return;
+        appState.timer.isRunning = true;
+        if (!appState.timer.intervalId) {
+            appState.timer.intervalId = setInterval(tick, 1000);
+        }
+        updateTimerDisplay();
+        saveTimerState();
+    }
+
+    function pauseTimer() {
+        appState.timer.isRunning = false;
+        updateTimerDisplay();
+        saveTimerState();
+    }
+
+    function resetTimer() {
+        appState.timer.isRunning = false;
+        appState.timer.timeLeft = appState.timer.mode === 'work' ? WORK_DURATION : BREAK_DURATION;
+        updateTimerDisplay();
+        saveTimerState();
+    }
+
+    // Day Streak
+    function todayKey() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = (d.getMonth() + 1).toString().padStart(2, '0');
+        const day = d.getDate().toString().padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    async function loadStreak() {
+        try {
+            // Prefer Firestore
+            if (db && appState.userId) {
+                const ref = db.collection('users').doc(appState.userId).collection('meta').doc('streak');
+                const snap = await ref.get();
+                if (snap.exists) {
+                    const data = snap.data() || {};
+                    document.getElementById('stat-streak').textContent = `${data.count || 0} 🔥`;
+                    saveToLocal(LS_KEYS.streak, data);
+                    return;
+                }
+            }
+        } catch (_) {}
+        // Fallback to local
+        const local = loadFromLocal(LS_KEYS.streak) || { count: 0, last: null };
+        document.getElementById('stat-streak').textContent = `${local.count || 0} 🔥`;
+    }
+
+    async function bumpStreak() {
+        const t = todayKey();
+        let current = loadFromLocal(LS_KEYS.streak) || { count: 0, last: null };
+        if (current.last === t) {
+            // already counted today
+        } else {
+            if (current.last) {
+                const prev = new Date(current.last);
+                const now = new Date(t);
+                const diffDays = Math.round((now - prev) / (1000 * 60 * 60 * 24));
+                current.count = diffDays === 1 ? (current.count + 1) : 1;
+            } else {
+                current.count = 1;
+            }
+            current.last = t;
+            saveToLocal(LS_KEYS.streak, current);
+            document.getElementById('stat-streak').textContent = `${current.count} 🔥`;
+            // Persist to Firestore best-effort
+            try {
+                if (db && appState.userId) {
+                    const ref = db.collection('users').doc(appState.userId).collection('meta').doc('streak');
+                    await ref.set({ count: current.count, last: current.last }, { merge: true });
+                }
+            } catch (_) {}
+        }
+    }
     function renderActivityChart() { /* noop */ }
 });
 
