@@ -79,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
             intervalId: null,
             timeLeft: 25 * 60,
             isRunning: false,
+            defaultTime: 25 * 60,
         }
     };
 
@@ -560,6 +561,23 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('timer-pause').addEventListener('click', pauseTimer);
     document.getElementById('timer-reset').addEventListener('click', resetTimer);
     document.getElementById('edit-video-btn').addEventListener('click', () => { /* optional custom logic */ });
+    if (timerSettingsBtn) timerSettingsBtn.addEventListener('click', () => {
+        if (!timerCustomization) return;
+        timerCustomization.classList.toggle('hidden');
+    });
+    if (setTimeBtn) setTimeBtn.addEventListener('click', () => {
+        if (!customTimeInput) return;
+        const minutes = parseInt(customTimeInput.value, 10);
+        if (Number.isNaN(minutes) || minutes <= 0) {
+            alert('Please enter a valid positive number of minutes.');
+            return;
+        }
+        appState.timer.defaultTime = minutes * 60;
+        if (appState.timer.mode === 'work') {
+            resetTimer();
+        }
+        if (timerCustomization) timerCustomization.classList.add('hidden');
+    });
     document.getElementById('syllabus-container').addEventListener('click', (e) => {
         const lessonItem = e.target.closest('.lesson-item');
         if (!lessonItem || !appState.currentCourse) return;
@@ -670,6 +688,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBtn = document.getElementById('timer-start');
     const pauseBtn = document.getElementById('timer-pause');
     const resetBtn = document.getElementById('timer-reset');
+    const timerSettingsBtn = document.getElementById('timer-settings-btn');
+    const timerCustomization = document.getElementById('timer-customization');
+    const customTimeInput = document.getElementById('custom-time-input');
+    const setTimeBtn = document.getElementById('set-time-btn');
 
     function formatTime(sec) {
         const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -682,6 +704,7 @@ document.addEventListener('DOMContentLoaded', () => {
             mode: appState.timer.mode,
             timeLeft: appState.timer.timeLeft,
             isRunning: appState.timer.isRunning,
+            defaultTime: appState.timer.defaultTime,
             ts: Date.now(),
         });
     }
@@ -690,14 +713,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const saved = loadFromLocal(LS_KEYS.timer);
         if (!saved) {
             appState.timer.mode = 'work';
-            appState.timer.timeLeft = WORK_DURATION;
+            appState.timer.defaultTime = 25 * 60;
+            appState.timer.timeLeft = appState.timer.defaultTime;
             appState.timer.isRunning = false;
             updateTimerDisplay();
             return;
         }
         // Basic restore without drift correction for simplicity
         appState.timer.mode = saved.mode || 'work';
-        appState.timer.timeLeft = typeof saved.timeLeft === 'number' ? saved.timeLeft : (saved.mode === 'break' ? BREAK_DURATION : WORK_DURATION);
+        appState.timer.defaultTime = typeof saved.defaultTime === 'number' ? saved.defaultTime : 25 * 60;
+        appState.timer.timeLeft = typeof saved.timeLeft === 'number' ? saved.timeLeft : (saved.mode === 'break' ? BREAK_DURATION : appState.timer.defaultTime);
         appState.timer.isRunning = false; // always start paused on restore for safety
         updateTimerDisplay();
     }
@@ -743,7 +768,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetTimer() {
         appState.timer.isRunning = false;
-        appState.timer.timeLeft = appState.timer.mode === 'work' ? WORK_DURATION : BREAK_DURATION;
+        if (appState.timer.mode === 'work') {
+            appState.timer.timeLeft = appState.timer.defaultTime;
+        } else {
+            appState.timer.timeLeft = BREAK_DURATION;
+        }
         updateTimerDisplay();
         saveTimerState();
     }
