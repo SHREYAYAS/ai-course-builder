@@ -106,16 +106,6 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboard: document.getElementById('view-dashboard')
     };
     const resumeBtn = document.getElementById('resume-btn');
-    // Auth UI elements
-    const signInBtn = document.getElementById('sign-in-btn');
-    const logoutBtn = document.getElementById('logout-btn');
-    const authModal = document.getElementById('auth-modal');
-    const authClose = document.getElementById('auth-close');
-    const authTabSignin = document.getElementById('auth-tab-signin');
-    const authTabSignup = document.getElementById('auth-tab-signup');
-    const authErrorEl = document.getElementById('auth-error');
-    const signinForm = document.getElementById('signin-form');
-    const signupForm = document.getElementById('signup-form');
     
     const tabButtons = {
         notes: document.getElementById('tab-notes'),
@@ -199,87 +189,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateAuthUI(user) {
         try {
-            const isAnon = !!user?.isAnonymous;
-            const email = user?.email || null;
-            if (signInBtn) signInBtn.classList.toggle('hidden', !isAnon);
-            if (logoutBtn) logoutBtn.classList.toggle('hidden', isAnon);
-            if (userStatusText) {
-                if (!isAnon && email) {
-                    userStatusText.textContent = `Welcome, ${email}`;
-                    userStatusText.classList.remove('hidden');
-                } else {
-                    userStatusText.textContent = 'Welcome, Learner!';
-                    // keep default toggle controlled by switchView
-                }
-            }
+            // Keep header text generic since sign-in UI is removed
+            if (userStatusText) userStatusText.textContent = 'Welcome, Learner!';
         } catch (_) {}
     }
 
-    function openAuthModal(defaultTab = 'signin') {
-        if (!authModal) return;
-        authModal.classList.remove('hidden');
-        setAuthTab(defaultTab);
-        clearAuthError();
-    }
-
-    function closeAuthModal() {
-        if (!authModal) return;
-        authModal.classList.add('hidden');
-        clearAuthError();
-        try {
-            const f1 = signinForm; const f2 = signupForm;
-            if (f1) f1.reset();
-            if (f2) f2.reset();
-        } catch (_) {}
-    }
-
-    function setAuthTab(tab) {
-        if (!authTabSignin || !authTabSignup || !signinForm || !signupForm) return;
-        const isSignin = tab === 'signin';
-        authTabSignin.classList.toggle('btn-primary', isSignin);
-        authTabSignin.classList.toggle('btn-secondary', !isSignin);
-        authTabSignup.classList.toggle('btn-primary', !isSignin);
-        authTabSignup.classList.toggle('btn-secondary', isSignin);
-        signinForm.classList.toggle('hidden', !isSignin);
-        signupForm.classList.toggle('hidden', isSignin);
-    }
-
-    function showAuthError(msg) {
-        if (!authErrorEl) return;
-        authErrorEl.textContent = msg || 'Authentication error. Please try again.';
-        authErrorEl.classList.remove('hidden');
-    }
-    function clearAuthError() {
-        if (!authErrorEl) return;
-        authErrorEl.textContent = '';
-        authErrorEl.classList.add('hidden');
-    }
-
-    function mapFirebaseAuthError(err) {
-        const code = err && err.code ? String(err.code) : '';
-        switch (code) {
-            case 'auth/operation-not-allowed':
-                return 'Email/Password sign-in is disabled or blocked by policy. In Firebase Console: (1) Authentication → Sign-in method → enable Email/Password; (2) Authentication → Settings → User actions: allow new user sign-ups and temporarily disable “Require email verification before updating email” if linking an anonymous account; (3) In Google Cloud → APIs & Services, ensure your Web API key allows Identity Toolkit API (no over-restriction).';
-            case 'auth/email-already-in-use':
-                return 'This email is already in use. Try signing in instead.';
-            case 'auth/invalid-email':
-                return 'That email address looks invalid. Please check and try again.';
-            case 'auth/weak-password':
-                return 'Password is too weak. Use at least 6 characters.';
-            case 'auth/wrong-password':
-                return 'Incorrect password. Please try again.';
-            case 'auth/user-not-found':
-                return 'No account found with that email. Try creating an account first.';
-            case 'auth/too-many-requests':
-                return 'Too many attempts. Please wait a moment and try again.';
-            case 'auth/network-request-failed':
-                return 'Network error. Check your connection and try again.';
-            case 'auth/unauthorized-domain':
-                return 'This domain is not authorized. Add your site domain in Firebase Console → Authentication → Settings → Authorized domains.';
-            default:
-                return (err && err.message) || 'Authentication failed. Please try again.';
-        }
-    }
+    // All auth modal helpers removed
 
     function updateResumeButton() {
         if (!resumeBtn) return;
@@ -565,53 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event Listeners ---
     document.getElementById('home-logo').addEventListener('click', () => switchView('generator'));
     document.getElementById('dashboard-btn').addEventListener('click', () => { switchView('dashboard'); });
-    if (signInBtn) signInBtn.addEventListener('click', () => openAuthModal('signin'));
-    if (logoutBtn) logoutBtn.addEventListener('click', async () => { try { await auth.signOut(); } catch (e) { console.warn('Sign out failed', e); } });
-    if (authClose) authClose.addEventListener('click', closeAuthModal);
-    if (authTabSignin) authTabSignin.addEventListener('click', () => setAuthTab('signin'));
-    if (authTabSignup) authTabSignup.addEventListener('click', () => setAuthTab('signup'));
-    if (signinForm) signinForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        clearAuthError();
-        try {
-            const email = document.getElementById('signin-email')?.value?.trim();
-            const password = document.getElementById('signin-password')?.value;
-            if (!email || !password) return showAuthError('Please enter email and password.');
-            // New approach: sign out anonymous user first, then sign in normally
-            appState.suppressAutoAnon = true;
-            try { if (auth.currentUser) await auth.signOut(); } catch (_) {}
-            // Sign in with email/password
-            await auth.signInWithEmailAndPassword(email, password);
-            closeAuthModal();
-        } catch (err) {
-            console.warn('Sign in failed:', err);
-            showAuthError(mapFirebaseAuthError(err));
-        } finally {
-            appState.suppressAutoAnon = false;
-        }
-    });
-    if (signupForm) signupForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        clearAuthError();
-        try {
-            const email = document.getElementById('signup-email')?.value?.trim();
-            const password = document.getElementById('signup-password')?.value;
-            const confirm = document.getElementById('signup-confirm')?.value;
-            if (!email || !password) return showAuthError('Please enter email and password.');
-            if (password !== confirm) return showAuthError('Passwords do not match.');
-            // New approach: sign out anonymous user first, then create user normally
-            appState.suppressAutoAnon = true;
-            try { if (auth.currentUser) await auth.signOut(); } catch (_) {}
-            await auth.createUserWithEmailAndPassword(email, password);
-            try { await auth.currentUser?.sendEmailVerification(); } catch (_) {}
-            closeAuthModal();
-        } catch (err) {
-            console.warn('Sign up failed:', err);
-            showAuthError(mapFirebaseAuthError(err));
-        } finally {
-            appState.suppressAutoAnon = false;
-        }
-    });
+    // Auth form event listeners removed
     if (resumeBtn) {
         resumeBtn.addEventListener('click', () => {
             const localCourse = loadFromLocal(LS_KEYS.lastCourse);
@@ -870,15 +739,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function renderActivityChart() { /* noop */ }
     
-    // Optional: runtime auth diagnostics when adding ?debugAuth=1 to the URL
-    try {
-        const params = new URLSearchParams(location.search);
-        if (params.has('debugAuth') && auth && firebase && firebase.app) {
-            console.log('[Auth Debug] firebase.app().options:', firebase.app().options);
-            firebase.auth().fetchSignInMethodsForEmail('debug@example.com')
-                .then(methods => console.log('[Auth Debug] fetchSignInMethodsForEmail ok:', methods))
-                .catch(e => console.log('[Auth Debug] fetchSignInMethodsForEmail error:', e && e.code, e && e.message));
-        }
-    } catch (_) {}
+    // Auth diagnostics removed
 });
 
