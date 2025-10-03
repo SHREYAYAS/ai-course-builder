@@ -79,8 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
             intervalId: null,
             timeLeft: 25 * 60,
             isRunning: false,
-        },
-        suppressAutoAnon: false,
+        }
     };
 
     // LocalStorage helpers (fallback persistence when no auth/DB)
@@ -153,12 +152,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadStreak();
                 restoreTimerState();
             } else {
-                // Only auto-anon when not in the middle of an email/password flow
-                if (!appState.suppressAutoAnon) {
-                    auth.signInAnonymously().catch(error => {
-                        console.error("Anonymous sign-in failed:", error);
-                    });
-                }
+                auth.signInAnonymously().catch(error => {
+                    console.error("Anonymous sign-in failed:", error);
+                });
             }
         });
     } else {
@@ -738,7 +734,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     function renderActivityChart() { /* noop */ }
-    
     // Auth diagnostics removed
 });
 
