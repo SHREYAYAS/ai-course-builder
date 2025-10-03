@@ -79,7 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
             intervalId: null,
             timeLeft: 25 * 60,
             isRunning: false,
-        }
+        },
+        suppressAutoAnon: false,
     };
 
     // LocalStorage helpers (fallback persistence when no auth/DB)
@@ -162,9 +163,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadStreak();
                 restoreTimerState();
             } else {
-                auth.signInAnonymously().catch(error => {
-                    console.error("Anonymous sign-in failed:", error);
-                });
+                // Only auto-anon when not in the middle of an email/password flow
+                if (!appState.suppressAutoAnon) {
+                    auth.signInAnonymously().catch(error => {
+                        console.error("Anonymous sign-in failed:", error);
+                    });
+                }
             }
         });
     } else {
@@ -255,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const code = err && err.code ? String(err.code) : '';
         switch (code) {
             case 'auth/operation-not-allowed':
-                return 'Email/Password sign-in is disabled for this project. In Firebase Console, enable Authentication → Sign-in method → Email/Password.';
+                return 'Email/Password sign-in is disabled or blocked by policy. In Firebase Console: (1) Authentication → Sign-in method → enable Email/Password; (2) Authentication → Settings → User actions: allow new user sign-ups and temporarily disable “Require email verification before updating email” if linking an anonymous account; (3) In Google Cloud → APIs & Services, ensure your Web API key allows Identity Toolkit API (no over-restriction).';
             case 'auth/email-already-in-use':
                 return 'This email is already in use. Try signing in instead.';
             case 'auth/invalid-email':
@@ -573,31 +577,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const email = document.getElementById('signin-email')?.value?.trim();
             const password = document.getElementById('signin-password')?.value;
             if (!email || !password) return showAuthError('Please enter email and password.');
-            const user = auth.currentUser;
-            const cred = firebase.auth.EmailAuthProvider.credential(email, password);
-            if (user && user.isAnonymous) {
-                // Try upgrade anonymous account to this email
-                try {
-                    await user.linkWithCredential(cred);
-                    try { await auth.currentUser?.sendEmailVerification(); } catch (_) {}
-                    closeAuthModal();
-                    return;
-                } catch (err) {
-                    if (err && (err.code === 'auth/credential-already-in-use' || err.code === 'auth/email-already-in-use')) {
-                        // Fall back to sign in (note: previous anon data won't auto-migrate)
-                        await auth.signInWithEmailAndPassword(email, password);
-                        closeAuthModal();
-                        return;
-                    }
-                    throw err;
-                }
-            }
-            // Regular sign in
+            // New approach: sign out anonymous user first, then sign in normally
+            appState.suppressAutoAnon = true;
+            try { if (auth.currentUser) await auth.signOut(); } catch (_) {}
+            // Sign in with email/password
             await auth.signInWithEmailAndPassword(email, password);
             closeAuthModal();
         } catch (err) {
             console.warn('Sign in failed:', err);
             showAuthError(mapFirebaseAuthError(err));
+        } finally {
+            appState.suppressAutoAnon = false;
         }
     });
     if (signupForm) signupForm.addEventListener('submit', async (e) => {
@@ -609,27 +599,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const confirm = document.getElementById('signup-confirm')?.value;
             if (!email || !password) return showAuthError('Please enter email and password.');
             if (password !== confirm) return showAuthError('Passwords do not match.');
-            const user = auth.currentUser;
-            const cred = firebase.auth.EmailAuthProvider.credential(email, password);
-            if (user && user.isAnonymous) {
-                try {
-                    await user.linkWithCredential(cred);
-                    try { await auth.currentUser?.sendEmailVerification(); } catch (_) {}
-                    closeAuthModal();
-                    return;
-                } catch (err) {
-                    if (err && (err.code === 'auth/email-already-in-use' || err.code === 'auth/credential-already-in-use')) {
-                        return showAuthError('Email already in use. Please sign in instead.');
-                    }
-                    throw err;
-                }
-            }
+            // New approach: sign out anonymous user first, then create user normally
+            appState.suppressAutoAnon = true;
+            try { if (auth.currentUser) await auth.signOut(); } catch (_) {}
             await auth.createUserWithEmailAndPassword(email, password);
             try { await auth.currentUser?.sendEmailVerification(); } catch (_) {}
             closeAuthModal();
         } catch (err) {
             console.warn('Sign up failed:', err);
             showAuthError(mapFirebaseAuthError(err));
+        } finally {
+            appState.suppressAutoAnon = false;
         }
     });
     if (resumeBtn) {
@@ -889,5 +869,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     function renderActivityChart() { /* noop */ }
+    
+    // Optional: runtime auth diagnostics when adding ?debugAuth=1 to the URL
+    try {
+        const params = new URLSearchParams(location.search);
+        if (params.has('debugAuth') && auth && firebase && firebase.app) {
+            console.log('[Auth Debug] firebase.app().options:', firebase.app().options);
+            firebase.auth().fetchSignInMethodsForEmail('debug@example.com')
+                .then(methods => console.log('[Auth Debug] fetchSignInMethodsForEmail ok:', methods))
+                .catch(e => console.log('[Auth Debug] fetchSignInMethodsForEmail error:', e && e.code, e && e.message));
+        }
+    } catch (_) {}
 });
 
