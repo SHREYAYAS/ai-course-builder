@@ -6,7 +6,7 @@
     <title>IntelliCourse - AI Learning Platform</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <!-- Inline favicon to avoid 404 requests for /favicon.ico -->
     <link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="%236B8A7A"/></svg>'>
@@ -19,64 +19,63 @@
  <body class="antialiased">
 
     <!-- Auth Modal -->
-    <div id="auth-modal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-        <div class="bg-white w-full max-w-md mx-4 rounded-2xl shadow-xl p-6">
-            <h2 class="text-2xl font-bold text-center mb-2">Welcome to IntelliCourse</h2>
-            <p id="auth-error" class="text-sm text-red-600 text-center min-h-[1.25rem]"></p>
+    <div id="auth-modal" class="fixed inset-0 center z-50">
+        <div id="auth-modal-content">
+            <h2 class="section-title center" style="justify-content:center; font-size:1.5rem; margin-bottom:.25rem;">Welcome to IntelliCourse</h2>
+            <p id="auth-error" class="error"></p>
             <div id="login-view">
                 <form id="login-form" class="space-y-4">
                     <div>
-                        <label for="login-email" class="block text-sm font-medium text-gray-700">Email</label>
-                        <input id="login-email" type="email" required class="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6B8A7A]">
+                        <label for="login-email" class="block text-sm muted">Email</label>
+                        <input id="login-email" type="email" required placeholder="you@example.com">
                     </div>
                     <div>
-                        <label for="login-password" class="block text-sm font-medium text-gray-700">Password</label>
-                        <input id="login-password" type="password" required minlength="6" class="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6B8A7A]">
+                        <label for="login-password" class="block text-sm muted">Password</label>
+                        <input id="login-password" type="password" required minlength="6" placeholder="••••••••">
                     </div>
                     <button type="submit" class="btn btn-primary w-full">Sign In</button>
                 </form>
-                <p class="mt-4 text-sm text-center text-gray-600">Don't have an account? <button id="to-signup-btn" class="text-[#6B8A7A] font-semibold hover:underline">Sign Up</button></p>
+                <p class="mt-4 text-sm center muted" style="justify-content:center">Don't have an account? <button id="to-signup-btn" class="btn btn-secondary" style="padding:.25rem .6rem; margin-left:.4rem;">Sign Up</button></p>
             </div>
             <div id="signup-view" class="hidden">
                 <form id="signup-form" class="space-y-4">
                     <div>
-                        <label for="signup-email" class="block text-sm font-medium text-gray-700">Email</label>
-                        <input id="signup-email" type="email" required class="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6B8A7A]">
+                        <label for="signup-email" class="block text-sm muted">Email</label>
+                        <input id="signup-email" type="email" required placeholder="you@example.com">
                     </div>
                     <div>
-                        <label for="signup-password" class="block text-sm font-medium text-gray-700">Password</label>
-                        <input id="signup-password" type="password" required minlength="6" class="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6B8A7A]">
+                        <label for="signup-password" class="block text-sm muted">Password</label>
+                        <input id="signup-password" type="password" required minlength="6" placeholder="••••••••">
                     </div>
                     <button type="submit" class="btn btn-primary w-full">Create Account</button>
                 </form>
-                <p class="mt-4 text-sm text-center text-gray-600">Already have an account? <button id="to-login-btn" class="text-[#6B8A7A] font-semibold hover:underline">Sign In</button></p>
+                <p class="mt-4 text-sm center muted" style="justify-content:center">Already have an account? <button id="to-login-btn" class="btn btn-secondary" style="padding:.25rem .6rem; margin-left:.4rem;">Sign In</button></p>
             </div>
         </div>
     </div>
 
     <div id="app-content" class="hidden">
     <div id="app" class="min-h-screen flex flex-col">
-        <header class="bg-white/90 backdrop-blur-lg border-b border-gray-200/80 sticky top-0 z-20">
-            <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex items-center justify-between h-16">
-                    <div class="flex items-center gap-2" id="home-logo">
-                         <div class="w-8 h-8 bg-gradient-to-br from-[#6B8A7A] to-[#8FB09B] rounded-lg"></div>
-                        <span class="text-2xl font-bold text-[#5A7D6C]">IntelliCourse</span>
+        <header class="site-header">
+            <nav class="container">
+                <div class="nav-bar">
+                    <div class="brand" id="home-logo">
+                        <div class="brand-mark"></div>
+                        <span class="brand-name">IntelliCourse</span>
                     </div>
-                    <div class="flex items-center gap-4">
-                        <span id="user-status-text" class="text-sm font-medium text-gray-500 hidden">Welcome, Learner!</span>
+                    <div class="header-actions">
+                        <span id="user-status-text" class="header-subtle hidden">Welcome, Learner!</span>
                         <div id="guest-info" class="hidden">
                             <button id="open-login-btn" class="btn btn-secondary">Sign In</button>
                         </div>
-                        <div id="user-info" class="hidden items-center gap-2">
-                            <span id="user-email" class="text-sm text-gray-600"></span>
+                        <div id="user-info" class="hidden" style="display:flex; align-items:center; gap:.5rem;">
+                            <span id="user-email" class="header-subtle"></span>
                             <button id="signout-btn" class="btn btn-secondary">Sign Out</button>
                         </div>
                         <button id="dashboard-btn" class="btn btn-secondary">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg>
                             <span>My Dashboard</span>
                         </button>
-                        <!-- Auth controls removed per request -->
                     </div>
                 </div>
             </nav>
@@ -84,21 +83,23 @@
 
         <main class="flex-grow">
             <!-- VIEW: Course Generator -->
-            <div id="view-generator" class="container mx-auto px-4 py-16 sm:py-24 text-center">
-                 <div class="max-w-3xl mx-auto">
-                    <h1 class="text-4xl md:text-6xl font-extrabold text-[#3F4A42] tracking-tighter">Your AI-Powered Learning Co-Pilot</h1>
-                    <p class="mt-6 max-w-2xl mx-auto text-lg text-gray-600">Stop searching, start learning. Describe any topic, and we'll build your personalized, video-based course in seconds.</p>
-                    <div class="mt-10 max-w-xl mx-auto flex flex-col sm:flex-row items-center gap-4 bg-white p-2 rounded-2xl custom-shadow border">
-                        <input id="topic-input" type="text" placeholder="e.g., 'Mastering React Hooks'" class="flex-grow w-full px-4 py-3 rounded-xl border-none focus:ring-2 focus:ring-[#6B8A7A] focus:outline-none">
-                        <button id="generate-course-btn" class="btn btn-primary w-full sm:w-auto">
+            <div id="view-generator" class="section">
+                 <div class="container">
+                    <h1 class="section-title" style="font-size:2.6rem; text-align:center;">Your AI-Powered Learning Co-Pilot</h1>
+                    <p class="muted" style="max-width:54ch; margin:.75rem auto 0; text-align:center;">Stop searching, start learning. Describe any topic, and we'll build your personalized, video-based course in seconds.</p>
+                    <div class="generator-wrap" style="max-width: 720px; margin: 2rem auto 0;">
+                        <div class="field">
+                            <input id="topic-input" type="text" placeholder="e.g., Mastering React Hooks">
+                        </div>
+                        <button id="generate-course-btn" class="btn btn-primary">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" /></svg>
                             <span>Generate Course</span>
                         </button>
                     </div>
                      <div id="loading-indicator" class="mt-8 hidden">
-                        <div class="flex justify-center items-center space-x-2">
-                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6B8A7A]"></div>
-                            <span class="text-gray-600">Building your custom curriculum...</span>
+                        <div class="center" style="gap:.5rem;">
+                            <div class="animate-spin" style="width: 2rem; height:2rem; border-radius:999px; border: 3px solid rgba(255,255,255,0.12); border-top-color: #818CF8;"></div>
+                            <span class="muted">Building your custom curriculum...</span>
                         </div>
                     </div>
                 </div>
@@ -106,29 +107,29 @@
 
             <!-- VIEW: Course Player -->
             <div id="view-course" class="hidden">
-                <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    <div id="yt-banner" class="hidden mb-4 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 px-4 py-3 text-sm"></div>
-                    <div class="lg:grid lg:grid-cols-12 lg:gap-8">
+                <div class="container section">
+                    <div id="yt-banner" class="hidden"></div>
+                    <div class="grid grid-12" style="gap:2rem;">
                         
-                        <aside class="lg:col-span-3 mb-8 lg:mb-0">
-                           <div class="sticky top-24 bg-white p-4 rounded-2xl custom-shadow border">
+                        <aside class="col-span-3" style="margin-bottom:2rem;">
+                           <div class="sticky top-24 custom-shadow" style="padding:1rem;">
                                 <h2 id="course-title-sidebar" class="text-xl font-bold mb-2"></h2>
-                                <p id="course-progress-text" class="text-sm text-gray-600 mb-2">0% Complete</p>
-                                <div class="w-full bg-gray-200 rounded-full h-2.5 mb-4">
-                                    <div id="course-progress-bar" class="bg-gradient-to-r from-[#6B8A7A] to-[#8FB09B] h-2.5 rounded-full transition-all duration-500"></div>
+                                <p id="course-progress-text" class="progress-text">0% Complete</p>
+                                <div class="progress" style="margin-bottom:1rem;">
+                                    <div id="course-progress-bar"></div>
                                 </div>
-                                <div id="syllabus-container" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2"></div>
+                                <div id="syllabus-container" class="space-y" style="max-height:60vh; overflow:auto; padding-right:.25rem;"></div>
                            </div>
                         </aside>
 
-                        <div class="lg:col-span-6">
-                            <div class="aspect-w-16 aspect-h-9 mb-4 bg-gray-900 rounded-2xl shadow-2xl shadow-gray-400/30 overflow-hidden" id="video-container">
+                        <div class="col-span-6">
+                            <div class="video-shell" id="video-container" style="margin-bottom:1rem;">
                                 <!-- Video Player/Upgrade message will be injected here by JS -->
                             </div>
-                            <div class="flex justify-between items-start gap-4">
-    <h1 id="lesson-title" class="text-3xl font-bold flex-1"></h1>
-    <div class="flex items-center gap-2 flex-shrink-0">
-        <button id="edit-video-btn" class="btn btn-secondary !p-2" title="Edit Video Link">
+                            <div class="center" style="justify-content:space-between; align-items:flex-start; gap:1rem;">
+    <h1 id="lesson-title" class="section-title" style="font-size:1.6rem; flex:1;"></h1>
+    <div class="center" style="gap:.5rem;">
+        <button id="edit-video-btn" class="btn btn-secondary" title="Edit Video Link">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
         </button>
         <button id="mark-complete-btn" class="btn btn-secondary">
@@ -139,36 +140,36 @@
 </div>
                             
                             <div class="mt-4">
-                                <div class="border-b border-gray-200">
-                                    <nav class="-mb-px flex space-x-6" aria-label="Tabs">
-                                        <button id="tab-notes" class="whitespace-nowrap pb-3 px-1 border-b-2 font-semibold text-sm text-[#5A7D6C] border-[#6B8A7A]">AI Notes</button>
-                                        <button id="tab-projects" class="whitespace-nowrap pb-3 px-1 border-b-2 font-semibold text-sm text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300">Project Ideas</button>
+                                <div style="border-bottom:1px solid var(--line);">
+                                    <nav class="center" style="gap:1rem; justify-content:flex-start;">
+                                        <button id="tab-notes" class="btn btn-secondary">AI Notes</button>
+                                        <button id="tab-projects" class="btn btn-secondary">Project Ideas</button>
                                     </nav>
                                 </div>
-                                <div id="content-notes" class="py-6 prose max-w-none prose-headings:text-[#3F4A42] prose-strong:text-[#3F4A42]"></div>
-                                <div id="content-projects" class="py-6 hidden prose max-w-none prose-headings:text-[#3F4A42]"></div>
+                                <div id="content-notes" class="py-6"></div>
+                                <div id="content-projects" class="py-6 hidden"></div>
                             </div>
                         </div>
                         
-                        <aside class="lg:col-span-3 mt-8 lg:mt-0">
-                            <div class="sticky top-24 space-y-6">
-                               <div class="bg-white p-4 rounded-2xl custom-shadow border">
+                        <aside class="col-span-3" style="margin-top:2rem;">
+                            <div class="sticky top-24 space-y">
+                               <div class="custom-shadow" style="padding:1rem;">
                                     <h3 class="font-bold text-lg mb-3 text-center">Productivity Tools</h3>
-                                    <div class="text-center p-4 bg-gray-50 rounded-xl">
+                                    <div class="text-center" style="padding:1rem; background:#0F1520; border-radius:12px;">
                                         <div class="text-5xl font-bold" id="timer-display">25:00</div>
-                                        <p class="text-sm text-gray-500 mb-4 font-medium">Focus Timer</p>
-                                        <div class="flex justify-center gap-2">
-                                            <button type="button" id="timer-start" class="btn btn-primary !p-2" title="Start Timer" aria-label="Start Timer"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg></button>
-                                            <button type="button" id="timer-pause" class="btn btn-secondary !p-2" title="Pause Timer" aria-label="Pause Timer"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h1a1 1 0 100-2H9V8a1 1 0 00-1-1zm4 0a1 1 0 00-1 1v4a1 1 0 001 1h1a1 1 0 100-2h-1V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg></button>
-                                            <button type="button" id="timer-reset" class="btn btn-secondary !p-2" title="Reset Timer" aria-label="Reset Timer"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" /></svg></button>
+                                        <p class="muted" style="margin-bottom:.75rem;">Focus Timer</p>
+                                        <div class="center" style="gap:.5rem;">
+                                            <button type="button" id="timer-start" class="btn btn-primary" title="Start Timer" aria-label="Start Timer"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg></button>
+                                            <button type="button" id="timer-pause" class="btn btn-secondary" title="Pause Timer" aria-label="Pause Timer"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h1a1 1 0 100-2H9V8a1 1 0 00-1-1zm4 0a1 1 0 00-1 1v4a1 1 0 001 1h1a1 1 0 100-2h-1V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg></button>
+                                            <button type="button" id="timer-reset" class="btn btn-secondary" title="Reset Timer" aria-label="Reset Timer"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" /></svg></button>
                                         </div>
                                     </div>
-                                    <div class="text-center p-4 bg-gray-50 rounded-xl mt-4">
+                                    <div class="text-center" style="padding:1rem; background:#0F1520; border-radius:12px; margin-top:1rem;">
                                         <div class="text-5xl font-bold" id="streak-counter">0</div>
-                                        <p class="text-sm text-gray-500 font-medium">Day Streak 🔥</p>
+                                        <p class="muted">Day Streak 🔥</p>
                                     </div>
                                 </div>
-                                <div class="bg-white p-4 rounded-2xl custom-shadow border text-center">
+                                <div class="custom-shadow center" style="flex-direction:column; padding:1rem;">
                                     <h3 class="font-bold text-lg mb-3">Course Management</h3>
                                     <button class="w-full btn btn-premium mb-2">Upgrade to Premium</button>
                                     <button class="w-full btn btn-secondary">Customize Course</button>
@@ -181,53 +182,53 @@
 
             <!-- VIEW: Dashboard -->
             <div id="view-dashboard" class="hidden">
-                <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div class="container section">
                 <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
-                    <h1 class="text-3xl font-bold">My Dashboard</h1>
+                    <h1 class="section-title" style="font-size:1.8rem;">My Dashboard</h1>
                     <div class="flex items-center gap-3">
                        <button id="resume-btn" class="btn btn-secondary hidden">Resume Learning</button>
                        <button id="create-new-course-btn" class="btn btn-primary">Create New Course</button>
                     </div>
                 </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                        <div class="bg-white p-6 rounded-2xl custom-shadow border flex items-center gap-4">
-                            <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-green-600">
+                    <div class="grid" style="grid-template-columns: repeat(3, minmax(0, 1fr)); gap:1rem; margin-bottom:2rem;">
+                        <div class="custom-shadow" style="padding:1rem; display:flex; align-items:center; gap:1rem;">
+                            <div class="center" style="width:48px; height:48px; border-radius:12px; background: rgba(16,185,129,0.12); color:#10B981;">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                             </div>
                             <div>
-                                <p class="text-gray-500">Courses in Progress</p>
-                                <p class="text-2xl font-bold" id="stat-courses">0</p>
+                                <p class="muted">Courses in Progress</p>
+                                <p class="section-title" style="font-size:1.6rem;" id="stat-courses">0</p>
                             </div>
                         </div>
-                         <div class="bg-white p-6 rounded-2xl custom-shadow border flex items-center gap-4">
-                            <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
+                         <div class="custom-shadow" style="padding:1rem; display:flex; align-items:center; gap:1rem;">
+                            <div class="center" style="width:48px; height:48px; border-radius:12px; background: rgba(59,130,246,0.12); color:#60A5FA;">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             </div>
                             <div>
-                                <p class="text-gray-500">Lessons Completed</p>
-                                <p class="text-2xl font-bold" id="stat-lessons">0</p>
+                                <p class="muted">Lessons Completed</p>
+                                <p class="section-title" style="font-size:1.6rem;" id="stat-lessons">0</p>
                             </div>
                         </div>
-                        <div class="bg-white p-6 rounded-2xl custom-shadow border flex items-center gap-4">
-                            <div class="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600">
+                        <div class="custom-shadow" style="padding:1rem; display:flex; align-items:center; gap:1rem;">
+                            <div class="center" style="width:48px; height:48px; border-radius:12px; background: rgba(245,158,11,0.12); color:#F59E0B;">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.657 7.343A8 8 0 0117.657 18.657z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 16.571L12 14M12 14l2.5 2.571M12 14v2.571" /></svg>
                             </div>
                             <div>
-                                <p class="text-gray-500">Current Streak</p>
-                                <p class="text-2xl font-bold" id="stat-streak">0 🔥</p>
+                                <p class="muted">Current Streak</p>
+                                <p class="section-title" style="font-size:1.6rem;" id="stat-streak">0 🔥</p>
                             </div>
                         </div>
                     </div>
                    
-                    <div class="bg-white p-6 rounded-2xl custom-shadow border mb-8">
-                        <h2 class="text-xl font-bold mb-4">Learning Activity (Last 7 Days)</h2>
+                    <div class="custom-shadow" style="padding:1rem; margin-bottom:2rem;">
+                        <h2 class="section-title" style="font-size:1.1rem; margin-bottom:.6rem;">Learning Activity (Last 7 Days)</h2>
                         <div class="chart-container">
                             <canvas id="activityChart"></canvas>
                         </div>
                     </div>
                     
-                    <h2 class="text-2xl font-bold mb-4">My Courses</h2>
+                    <h2 class="section-title" style="font-size:1.6rem; margin-bottom:1rem;">My Courses</h2>
                     <div id="dashboard-courses-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <!-- Course cards will be injected by JS -->
                     </div>
@@ -236,8 +237,8 @@
 
         </main>
         
-        <footer class="bg-white mt-12 border-t">
-            <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-gray-500">
+        <footer class="section">
+            <div class="container center" style="justify-content:center;">
                 <p>&copy; 2025 IntelliCourse. All rights reserved.</p>
             </div>
         </footer>
