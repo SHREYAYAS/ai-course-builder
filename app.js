@@ -138,7 +138,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (user) {
                 appState.userId = user.uid;
                 console.log("User signed in with ID:", appState.userId);
-                updateAuthUI(user);
                 switchView('dashboard');
                 renderDashboard();
                 // Clear any anonymous local userId mismatch
@@ -179,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (views[viewName]) {
             views[viewName].classList.remove('hidden');
         }
-        if (userStatusText) userStatusText.classList.toggle('hidden', appState.userId === null || viewName === 'generator');
+        userStatusText.classList.toggle('hidden', appState.userId === null || viewName === 'generator');
         updateResumeButton();
     };
 
@@ -191,7 +190,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // All auth modal helpers removed
-
     function updateResumeButton() {
         if (!resumeBtn) return;
         const localCourse = loadFromLocal(LS_KEYS.lastCourse);
