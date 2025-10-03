@@ -32,6 +32,8 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg>
                             <span>My Dashboard</span>
                         </button>
+                        <button id="sign-in-btn" class="btn btn-primary">Sign In</button>
+                        <button id="logout-btn" class="btn btn-secondary hidden">Logout</button>
                     </div>
                 </div>
             </nav>
@@ -196,6 +198,52 @@
                 <p>&copy; 2025 IntelliCourse. All rights reserved.</p>
             </div>
         </footer>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="hidden fixed inset-0 z-30 bg-black/40 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl custom-shadow border">
+            <div class="p-5 border-b flex items-center justify-between">
+                <h3 class="font-bold text-lg">Welcome back</h3>
+                <button id="auth-close" class="btn btn-secondary !p-2" aria-label="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                </button>
+            </div>
+            <div class="px-5 pt-4">
+                <div class="flex gap-2 mb-4">
+                    <button id="auth-tab-signin" class="btn btn-secondary">Sign In</button>
+                    <button id="auth-tab-signup" class="btn btn-secondary">Create Account</button>
+                </div>
+                <div id="auth-error" class="hidden mb-3 text-sm text-red-600"></div>
+                <form id="signin-form" class="space-y-3">
+                    <div>
+                        <label class="text-sm text-gray-600">Email</label>
+                        <input id="signin-email" type="email" class="w-full px-3 py-2 rounded-xl border" placeholder="you@example.com" required />
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-600">Password</label>
+                        <input id="signin-password" type="password" class="w-full px-3 py-2 rounded-xl border" placeholder="••••••••" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary w-full">Sign In</button>
+                </form>
+                <form id="signup-form" class="space-y-3 hidden">
+                    <div>
+                        <label class="text-sm text-gray-600">Email</label>
+                        <input id="signup-email" type="email" class="w-full px-3 py-2 rounded-xl border" placeholder="you@example.com" required />
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-600">Password (min 6 chars)</label>
+                        <input id="signup-password" type="password" minlength="6" class="w-full px-3 py-2 rounded-xl border" placeholder="••••••••" required />
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-600">Confirm password</label>
+                        <input id="signup-confirm" type="password" minlength="6" class="w-full px-3 py-2 rounded-xl border" placeholder="••••••••" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary w-full">Create Account</button>
+                </form>
+            </div>
+            <div class="p-4"></div>
+        </div>
     </div>
 
     <script src="app.js"></script>

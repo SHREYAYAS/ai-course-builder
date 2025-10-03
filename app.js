@@ -105,6 +105,16 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboard: document.getElementById('view-dashboard')
     };
     const resumeBtn = document.getElementById('resume-btn');
+    // Auth UI elements
+    const signInBtn = document.getElementById('sign-in-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const authModal = document.getElementById('auth-modal');
+    const authClose = document.getElementById('auth-close');
+    const authTabSignin = document.getElementById('auth-tab-signin');
+    const authTabSignup = document.getElementById('auth-tab-signup');
+    const authErrorEl = document.getElementById('auth-error');
+    const signinForm = document.getElementById('signin-form');
+    const signupForm = document.getElementById('signup-form');
     
     const tabButtons = {
         notes: document.getElementById('tab-notes'),
@@ -138,6 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (user) {
                 appState.userId = user.uid;
                 console.log("User signed in with ID:", appState.userId);
+                updateAuthUI(user);
                 switchView('dashboard');
                 renderDashboard();
                 // Clear any anonymous local userId mismatch
@@ -178,9 +189,93 @@ document.addEventListener('DOMContentLoaded', () => {
         if (views[viewName]) {
             views[viewName].classList.remove('hidden');
         }
-        userStatusText.classList.toggle('hidden', appState.userId === null || viewName === 'generator');
+        if (userStatusText) userStatusText.classList.toggle('hidden', appState.userId === null || viewName === 'generator');
         updateResumeButton();
     };
+
+    function updateAuthUI(user) {
+        try {
+            const isAnon = !!user?.isAnonymous;
+            const email = user?.email || null;
+            if (signInBtn) signInBtn.classList.toggle('hidden', !isAnon);
+            if (logoutBtn) logoutBtn.classList.toggle('hidden', isAnon);
+            if (userStatusText) {
+                if (!isAnon && email) {
+                    userStatusText.textContent = `Welcome, ${email}`;
+                    userStatusText.classList.remove('hidden');
+                } else {
+                    userStatusText.textContent = 'Welcome, Learner!';
+                    // keep default toggle controlled by switchView
+                }
+            }
+        } catch (_) {}
+    }
+
+    function openAuthModal(defaultTab = 'signin') {
+        if (!authModal) return;
+        authModal.classList.remove('hidden');
+        setAuthTab(defaultTab);
+        clearAuthError();
+    }
+
+    function closeAuthModal() {
+        if (!authModal) return;
+        authModal.classList.add('hidden');
+        clearAuthError();
+        try {
+            const f1 = signinForm; const f2 = signupForm;
+            if (f1) f1.reset();
+            if (f2) f2.reset();
+        } catch (_) {}
+    }
+
+    function setAuthTab(tab) {
+        if (!authTabSignin || !authTabSignup || !signinForm || !signupForm) return;
+        const isSignin = tab === 'signin';
+        authTabSignin.classList.toggle('btn-primary', isSignin);
+        authTabSignin.classList.toggle('btn-secondary', !isSignin);
+        authTabSignup.classList.toggle('btn-primary', !isSignin);
+        authTabSignup.classList.toggle('btn-secondary', isSignin);
+        signinForm.classList.toggle('hidden', !isSignin);
+        signupForm.classList.toggle('hidden', isSignin);
+    }
+
+    function showAuthError(msg) {
+        if (!authErrorEl) return;
+        authErrorEl.textContent = msg || 'Authentication error. Please try again.';
+        authErrorEl.classList.remove('hidden');
+    }
+    function clearAuthError() {
+        if (!authErrorEl) return;
+        authErrorEl.textContent = '';
+        authErrorEl.classList.add('hidden');
+    }
+
+    function mapFirebaseAuthError(err) {
+        const code = err && err.code ? String(err.code) : '';
+        switch (code) {
+            case 'auth/operation-not-allowed':
+                return 'Email/Password sign-in is disabled for this project. In Firebase Console, enable Authentication → Sign-in method → Email/Password.';
+            case 'auth/email-already-in-use':
+                return 'This email is already in use. Try signing in instead.';
+            case 'auth/invalid-email':
+                return 'That email address looks invalid. Please check and try again.';
+            case 'auth/weak-password':
+                return 'Password is too weak. Use at least 6 characters.';
+            case 'auth/wrong-password':
+                return 'Incorrect password. Please try again.';
+            case 'auth/user-not-found':
+                return 'No account found with that email. Try creating an account first.';
+            case 'auth/too-many-requests':
+                return 'Too many attempts. Please wait a moment and try again.';
+            case 'auth/network-request-failed':
+                return 'Network error. Check your connection and try again.';
+            case 'auth/unauthorized-domain':
+                return 'This domain is not authorized. Add your site domain in Firebase Console → Authentication → Settings → Authorized domains.';
+            default:
+                return (err && err.message) || 'Authentication failed. Please try again.';
+        }
+    }
 
     function updateResumeButton() {
         if (!resumeBtn) return;
@@ -466,6 +561,77 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event Listeners ---
     document.getElementById('home-logo').addEventListener('click', () => switchView('generator'));
     document.getElementById('dashboard-btn').addEventListener('click', () => { switchView('dashboard'); });
+    if (signInBtn) signInBtn.addEventListener('click', () => openAuthModal('signin'));
+    if (logoutBtn) logoutBtn.addEventListener('click', async () => { try { await auth.signOut(); } catch (e) { console.warn('Sign out failed', e); } });
+    if (authClose) authClose.addEventListener('click', closeAuthModal);
+    if (authTabSignin) authTabSignin.addEventListener('click', () => setAuthTab('signin'));
+    if (authTabSignup) authTabSignup.addEventListener('click', () => setAuthTab('signup'));
+    if (signinForm) signinForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        clearAuthError();
+        try {
+            const email = document.getElementById('signin-email')?.value?.trim();
+            const password = document.getElementById('signin-password')?.value;
+            if (!email || !password) return showAuthError('Please enter email and password.');
+            const user = auth.currentUser;
+            const cred = firebase.auth.EmailAuthProvider.credential(email, password);
+            if (user && user.isAnonymous) {
+                // Try upgrade anonymous account to this email
+                try {
+                    await user.linkWithCredential(cred);
+                    try { await auth.currentUser?.sendEmailVerification(); } catch (_) {}
+                    closeAuthModal();
+                    return;
+                } catch (err) {
+                    if (err && (err.code === 'auth/credential-already-in-use' || err.code === 'auth/email-already-in-use')) {
+                        // Fall back to sign in (note: previous anon data won't auto-migrate)
+                        await auth.signInWithEmailAndPassword(email, password);
+                        closeAuthModal();
+                        return;
+                    }
+                    throw err;
+                }
+            }
+            // Regular sign in
+            await auth.signInWithEmailAndPassword(email, password);
+            closeAuthModal();
+        } catch (err) {
+            console.warn('Sign in failed:', err);
+            showAuthError(mapFirebaseAuthError(err));
+        }
+    });
+    if (signupForm) signupForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        clearAuthError();
+        try {
+            const email = document.getElementById('signup-email')?.value?.trim();
+            const password = document.getElementById('signup-password')?.value;
+            const confirm = document.getElementById('signup-confirm')?.value;
+            if (!email || !password) return showAuthError('Please enter email and password.');
+            if (password !== confirm) return showAuthError('Passwords do not match.');
+            const user = auth.currentUser;
+            const cred = firebase.auth.EmailAuthProvider.credential(email, password);
+            if (user && user.isAnonymous) {
+                try {
+                    await user.linkWithCredential(cred);
+                    try { await auth.currentUser?.sendEmailVerification(); } catch (_) {}
+                    closeAuthModal();
+                    return;
+                } catch (err) {
+                    if (err && (err.code === 'auth/email-already-in-use' || err.code === 'auth/credential-already-in-use')) {
+                        return showAuthError('Email already in use. Please sign in instead.');
+                    }
+                    throw err;
+                }
+            }
+            await auth.createUserWithEmailAndPassword(email, password);
+            try { await auth.currentUser?.sendEmailVerification(); } catch (_) {}
+            closeAuthModal();
+        } catch (err) {
+            console.warn('Sign up failed:', err);
+            showAuthError(mapFirebaseAuthError(err));
+        }
+    });
     if (resumeBtn) {
         resumeBtn.addEventListener('click', () => {
             const localCourse = loadFromLocal(LS_KEYS.lastCourse);
@@ -608,13 +774,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function restoreTimerState() {
         const saved = loadFromLocal(LS_KEYS.timer);
-                if (resp.ok) {
+        if (!saved) {
             appState.timer.mode = 'work';
             appState.timer.timeLeft = WORK_DURATION;
             appState.timer.isRunning = false;
             updateTimerDisplay();
             return;
-                    try { bumpStreak(); } catch (_) {}
         }
         // Basic restore without drift correction for simplicity
         appState.timer.mode = saved.mode || 'work';
@@ -625,7 +790,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateTimerDisplay() {
         const sec = Math.max(0, appState.timer.timeLeft);
-            try { bumpStreak(); } catch (_) {}
         if (timerDisplayEl) timerDisplayEl.textContent = formatTime(sec);
         // Update button states
         if (startBtn) startBtn.disabled = appState.timer.isRunning;
