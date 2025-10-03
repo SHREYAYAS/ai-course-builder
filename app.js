@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const appState = {
         currentView: 'generator',
         currentCourse: null,
-        userId: null, // We will get this after the user logs in
+        user: null, // Firebase user when signed in
         timer: {
             intervalId: null,
             timeLeft: 25 * 60,
@@ -98,6 +98,22 @@ document.addEventListener('DOMContentLoaded', () => {
             return raw ? JSON.parse(raw) : null;
         } catch (_) { return null; }
     };
+
+    // Auth modal and header controls
+    const authModal = document.getElementById('auth-modal');
+    const appContent = document.getElementById('app-content');
+    const loginView = document.getElementById('login-view');
+    const signupView = document.getElementById('signup-view');
+    const loginForm = document.getElementById('login-form');
+    const signupForm = document.getElementById('signup-form');
+    const toSignupBtn = document.getElementById('to-signup-btn');
+    const toLoginBtn = document.getElementById('to-login-btn');
+    const openLoginBtn = document.getElementById('open-login-btn');
+    const signoutBtn = document.getElementById('signout-btn');
+    const userInfo = document.getElementById('user-info');
+    const guestInfo = document.getElementById('guest-info');
+    const userEmailEl = document.getElementById('user-email');
+    const authErrorEl = document.getElementById('auth-error');
 
     const views = {
         generator: document.getElementById('view-generator'),
@@ -131,42 +147,77 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // --- 3. AUTHENTICATION ---
-    // Use anonymous authentication to give each user a unique, persistent ID.
+    // --- 3. AUTHENTICATION (Email/Password) ---
+    function show(el) { if (el) el.classList.remove('hidden'); }
+    function hide(el) { if (el) el.classList.add('hidden'); }
+    function setError(msg) { if (authErrorEl) authErrorEl.textContent = msg || ''; }
+    function switchAuthView(view) {
+        if (view === 'login') {
+            show(loginView); hide(signupView);
+        } else {
+            show(signupView); hide(loginView);
+        }
+        setError('');
+    }
+
+    async function handleSignUp(email, password) {
+        setError('');
+        try {
+            await auth.createUserWithEmailAndPassword(email, password);
+        } catch (e) {
+            console.error('Sign up failed:', e);
+            setError(e && e.message ? e.message : 'Sign up failed');
+        }
+    }
+
+    async function handleSignIn(email, password) {
+        setError('');
+        try {
+            await auth.signInWithEmailAndPassword(email, password);
+        } catch (e) {
+            console.error('Sign in failed:', e);
+            setError(e && e.message ? e.message : 'Sign in failed');
+        }
+    }
+
+    async function handleSignOut() {
+        setError('');
+        try {
+            await auth.signOut();
+        } catch (e) {
+            console.error('Sign out failed:', e);
+            setError(e && e.message ? e.message : 'Sign out failed');
+        }
+    }
+
     if (auth && typeof auth.onAuthStateChanged === 'function') {
         auth.onAuthStateChanged(user => {
+            appState.user = user || null;
+            const uid = appState.user ? appState.user.uid : null;
             if (user) {
-                appState.userId = user.uid;
-                console.log("User signed in with ID:", appState.userId);
+                // UI for logged-in
+                hide(authModal);
+                show(appContent);
+                if (userInfo) show(userInfo);
+                if (guestInfo) hide(guestInfo);
+                if (userEmailEl) userEmailEl.textContent = user.email || '';
                 switchView('dashboard');
                 renderDashboard();
-                // Clear any anonymous local userId mismatch
-                saveToLocal(LS_KEYS.lastUserId, appState.userId);
-                // If there is a locally saved course, open it immediately as a resume fallback
-                const localCourse = loadFromLocal(LS_KEYS.lastCourse);
-                if (localCourse) {
-                    loadCourse(localCourse);
-                }
-                // Load streak and timer state
+                // Load streak/timer and resume last course
                 loadStreak();
                 restoreTimerState();
+                const localCourse = loadFromLocal(LS_KEYS.lastCourse);
+                if (localCourse) loadCourse(localCourse);
             } else {
-                auth.signInAnonymously().catch(error => {
-                    console.error("Anonymous sign-in failed:", error);
-                });
+                // UI for logged-out
+                show(authModal);
+                hide(appContent);
+                if (userInfo) hide(userInfo);
+                if (guestInfo) show(guestInfo);
+                switchAuthView('login');
+                switchView('generator');
             }
         });
-    } else {
-        // No auth available; stay in generator view and allow generating without a userId
-        switchView('generator');
-        // Try restore last course if any
-        const localCourse = loadFromLocal(LS_KEYS.lastCourse);
-        if (localCourse) {
-            loadCourse(localCourse);
-        }
-        // Load timer/streak from local when offline
-        loadStreak();
-        restoreTimerState();
     }
 
 
@@ -178,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (views[viewName]) {
             views[viewName].classList.remove('hidden');
         }
-        userStatusText.classList.toggle('hidden', appState.userId === null || viewName === 'generator');
+        userStatusText.classList.toggle('hidden', !appState.user || viewName === 'generator');
         updateResumeButton();
     };
 
@@ -215,12 +266,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     const renderDashboard = () => {
-        if (!appState.userId) return;
+    const uid = appState.user && appState.user.uid;
+    if (!uid) return;
 
         const grid = document.getElementById('dashboard-courses-grid');
         grid.innerHTML = '<p class="text-gray-500">Loading your courses...</p>';
 
-        const coursesRef = db.collection('users').doc(appState.userId).collection('courses');
+    const coursesRef = db.collection('users').doc(uid).collection('courses');
         
         coursesRef.onSnapshot(querySnapshot => {
             const courses = [];
@@ -346,7 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 // Send topic and userId when available
-                body: JSON.stringify({ topic: topic, userId: appState.userId || null }),
+                body: JSON.stringify({ topic: topic, userId: (appState.user && appState.user.uid) || null }),
             });
 
             // Fallback: some versions/routes used /api/generate-course
@@ -355,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 response = await fetch(`${API_BASE}/api/generate-course`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ topic: topic, userId: appState.userId || null }),
+                    body: JSON.stringify({ topic: topic, userId: (appState.user && appState.user.uid) || null }),
                 });
             }
 
@@ -365,11 +417,11 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log("Received course from server with ID:", courseData.id, 'saved:', courseData.saved);
 
             // Client-side fallback save if server couldn't save (e.g., no admin key) and we have userId
-            if (!courseData.saved && appState.userId && db) {
+            if (!courseData.saved && appState.user && db) {
                 try {
-                    await db.collection('users').doc(appState.userId).collection('courses').doc(String(courseData.id)).set({
+                    await db.collection('users').doc(appState.user.uid).collection('courses').doc(String(courseData.id)).set({
                         ...courseData,
-                        ownerId: appState.userId,
+                        ownerId: appState.user.uid,
                         createdAt: courseData.createdAt || new Date().toISOString(),
                     }, { merge: true });
                     console.log('Saved course to Firestore (client-side).');
@@ -398,9 +450,9 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             e.stopPropagation();
             const card = resumeEl.closest('[data-course-id]');
-            if (card && appState.userId) {
+            if (card && appState.user) {
                 const courseId = card.dataset.courseId;
-                const courseDoc = await db.collection('users').doc(appState.userId).collection('courses').doc(courseId).get();
+                const courseDoc = await db.collection('users').doc(appState.user.uid).collection('courses').doc(courseId).get();
                 if (courseDoc.exists) {
                     loadCourse({ id: courseDoc.id, ...courseDoc.data() });
                     saveToLocal(LS_KEYS.lastCourse, { id: courseDoc.id, ...courseDoc.data() });
@@ -409,9 +461,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         const card = e.target.closest('[data-course-id]');
-        if(card && appState.userId) {
+        if(card && appState.user) {
             const courseId = card.dataset.courseId;
-            const courseDoc = await db.collection('users').doc(appState.userId).collection('courses').doc(courseId).get();
+            const courseDoc = await db.collection('users').doc(appState.user.uid).collection('courses').doc(courseId).get();
             if (courseDoc.exists) {
                 loadCourse({ id: courseDoc.id, ...courseDoc.data() });
                 saveToLocal(LS_KEYS.lastCourse, { id: courseDoc.id, ...courseDoc.data() });
@@ -439,12 +491,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Try server update first (preferred)
         try {
-            if (appState.userId) {
+            if (appState.user) {
                 const resp = await fetch(`${API_BASE}/courses/${encodeURIComponent(appState.currentCourse.id)}/complete`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        userId: appState.userId,
+                        userId: appState.user.uid,
                         moduleIndex,
                         lessonIndex,
                         completed: nextState,
@@ -460,8 +512,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             // Client-side fallback if server not available
-            if (db && appState.userId) {
-                const ref = db.collection('users').doc(appState.userId).collection('courses').doc(String(appState.currentCourse.id));
+            if (db && appState.user) {
+                const ref = db.collection('users').doc(appState.user.uid).collection('courses').doc(String(appState.currentCourse.id));
                 const updatedAt = new Date().toISOString();
                 appState.currentCourse.updatedAt = updatedAt;
                 await ref.set({ ...appState.currentCourse, updatedAt }, { merge: true });
@@ -474,6 +526,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event Listeners ---
     document.getElementById('home-logo').addEventListener('click', () => switchView('generator'));
     document.getElementById('dashboard-btn').addEventListener('click', () => { switchView('dashboard'); });
+    // Auth form event listeners
+    if (loginForm) loginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value;
+        handleSignIn(email, password);
+    });
+    if (signupForm) signupForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const email = document.getElementById('signup-email').value.trim();
+        const password = document.getElementById('signup-password').value;
+        handleSignUp(email, password);
+    });
+    if (toSignupBtn) toSignupBtn.addEventListener('click', () => switchAuthView('signup'));
+    if (toLoginBtn) toLoginBtn.addEventListener('click', () => switchAuthView('login'));
+    if (openLoginBtn) openLoginBtn.addEventListener('click', () => {
+        switchAuthView('login'); show(authModal);
+    });
+    if (signoutBtn) signoutBtn.addEventListener('click', () => handleSignOut());
     // Auth form event listeners removed
     if (resumeBtn) {
         resumeBtn.addEventListener('click', () => {
@@ -570,9 +641,9 @@ document.addEventListener('DOMContentLoaded', () => {
     markCompleteBtn.disabled = false;
         course.activeLesson = { moduleIndex, lessonIndex };
         // Persist last active lesson to Firestore (best-effort)
-        if (db && appState.userId && course.id) {
+        if (db && appState.user && course.id) {
             try {
-                const ref = db.collection('users').doc(appState.userId).collection('courses').doc(String(course.id));
+                const ref = db.collection('users').doc(appState.user.uid).collection('courses').doc(String(course.id));
                 const updatedAt = new Date().toISOString();
                 course.updatedAt = updatedAt;
                 ref.set({ activeLesson: { moduleIndex, lessonIndex }, updatedAt }, { merge: true });
@@ -689,8 +760,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadStreak() {
         try {
             // Prefer Firestore
-            if (db && appState.userId) {
-                const ref = db.collection('users').doc(appState.userId).collection('meta').doc('streak');
+            if (db && appState.user) {
+                const ref = db.collection('users').doc(appState.user.uid).collection('meta').doc('streak');
                 const snap = await ref.get();
                 if (snap.exists) {
                     const data = snap.data() || {};
@@ -724,8 +795,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('stat-streak').textContent = `${current.count} 🔥`;
             // Persist to Firestore best-effort
             try {
-                if (db && appState.userId) {
-                    const ref = db.collection('users').doc(appState.userId).collection('meta').doc('streak');
+                if (db && appState.user) {
+                    const ref = db.collection('users').doc(appState.user.uid).collection('meta').doc('streak');
                     await ref.set({ count: current.count, last: current.last }, { merge: true });
                 }
             } catch (_) {}

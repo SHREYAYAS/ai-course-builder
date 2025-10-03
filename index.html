@@ -15,9 +15,46 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore-compat.js"></script>
 
-</head>
-<body class="antialiased">
+ </head>
+ <body class="antialiased">
 
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <div class="bg-white w-full max-w-md mx-4 rounded-2xl shadow-xl p-6">
+            <h2 class="text-2xl font-bold text-center mb-2">Welcome to IntelliCourse</h2>
+            <p id="auth-error" class="text-sm text-red-600 text-center min-h-[1.25rem]"></p>
+            <div id="login-view">
+                <form id="login-form" class="space-y-4">
+                    <div>
+                        <label for="login-email" class="block text-sm font-medium text-gray-700">Email</label>
+                        <input id="login-email" type="email" required class="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6B8A7A]">
+                    </div>
+                    <div>
+                        <label for="login-password" class="block text-sm font-medium text-gray-700">Password</label>
+                        <input id="login-password" type="password" required minlength="6" class="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6B8A7A]">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-full">Sign In</button>
+                </form>
+                <p class="mt-4 text-sm text-center text-gray-600">Don't have an account? <button id="to-signup-btn" class="text-[#6B8A7A] font-semibold hover:underline">Sign Up</button></p>
+            </div>
+            <div id="signup-view" class="hidden">
+                <form id="signup-form" class="space-y-4">
+                    <div>
+                        <label for="signup-email" class="block text-sm font-medium text-gray-700">Email</label>
+                        <input id="signup-email" type="email" required class="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6B8A7A]">
+                    </div>
+                    <div>
+                        <label for="signup-password" class="block text-sm font-medium text-gray-700">Password</label>
+                        <input id="signup-password" type="password" required minlength="6" class="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6B8A7A]">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-full">Create Account</button>
+                </form>
+                <p class="mt-4 text-sm text-center text-gray-600">Already have an account? <button id="to-login-btn" class="text-[#6B8A7A] font-semibold hover:underline">Sign In</button></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-content" class="hidden">
     <div id="app" class="min-h-screen flex flex-col">
         <header class="bg-white/90 backdrop-blur-lg border-b border-gray-200/80 sticky top-0 z-20">
             <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -28,6 +65,13 @@
                     </div>
                     <div class="flex items-center gap-4">
                         <span id="user-status-text" class="text-sm font-medium text-gray-500 hidden">Welcome, Learner!</span>
+                        <div id="guest-info" class="hidden">
+                            <button id="open-login-btn" class="btn btn-secondary">Sign In</button>
+                        </div>
+                        <div id="user-info" class="hidden items-center gap-2">
+                            <span id="user-email" class="text-sm text-gray-600"></span>
+                            <button id="signout-btn" class="btn btn-secondary">Sign Out</button>
+                        </div>
                         <button id="dashboard-btn" class="btn btn-secondary">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg>
                             <span>My Dashboard</span>
@@ -198,8 +242,8 @@
             </div>
         </footer>
     </div>
+    </div>
 
-    <!-- Auth modal removed per request -->
     <script src="app.js"></script>
 </body>
 </html>
