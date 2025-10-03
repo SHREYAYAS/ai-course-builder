@@ -563,6 +563,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('edit-video-btn').addEventListener('click', () => { /* optional custom logic */ });
     if (timerSettingsBtn) timerSettingsBtn.addEventListener('click', () => {
         if (!timerCustomization) return;
+        // Prefill with current default minutes for convenience
+        if (customTimeInput) {
+            const mins = Math.max(1, Math.round((appState.timer.defaultTime || 1500) / 60));
+            customTimeInput.value = String(mins);
+        }
         timerCustomization.classList.toggle('hidden');
     });
     if (setTimeBtn) setTimeBtn.addEventListener('click', () => {
@@ -572,10 +577,14 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Please enter a valid positive number of minutes.');
             return;
         }
-        appState.timer.defaultTime = minutes * 60;
-        if (appState.timer.mode === 'work') {
-            resetTimer();
-        }
+        const secs = minutes * 60;
+        appState.timer.defaultTime = secs;
+        // Apply immediately and ensure we're in work mode for clarity
+        appState.timer.mode = 'work';
+        appState.timer.isRunning = false;
+        appState.timer.timeLeft = secs;
+        updateTimerDisplay();
+        saveTimerState();
         if (timerCustomization) timerCustomization.classList.add('hidden');
     });
     document.getElementById('syllabus-container').addEventListener('click', (e) => {
@@ -742,7 +751,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (appState.timer.timeLeft <= 0) {
             // Auto-switch modes
             appState.timer.mode = appState.timer.mode === 'work' ? 'break' : 'work';
-            appState.timer.timeLeft = appState.timer.mode === 'work' ? WORK_DURATION : BREAK_DURATION;
+            // When entering work mode, honor the user-customized defaultTime
+            appState.timer.timeLeft = appState.timer.mode === 'work' ? (appState.timer.defaultTime || WORK_DURATION) : BREAK_DURATION;
             // Simple feedback
             try { window.navigator.vibrate && window.navigator.vibrate(200); } catch (_) {}
         }
