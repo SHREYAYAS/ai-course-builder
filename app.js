@@ -557,44 +557,38 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('create-new-course-btn').addEventListener('click', () => switchView('generator'));
     tabButtons.notes.addEventListener('click', () => switchTab('notes'));
     tabButtons.projects.addEventListener('click', () => switchTab('projects'));
-    // Timer button listeners: ensure elements exist before attaching
-    const timerStartBtn = document.getElementById('timer-start');
-    const timerPauseBtn = document.getElementById('timer-pause');
-    const timerResetBtn = document.getElementById('timer-reset');
-    if (timerStartBtn) timerStartBtn.addEventListener('click', startTimer);
-    if (timerPauseBtn) timerPauseBtn.addEventListener('click', pauseTimer);
-    if (timerResetBtn) timerResetBtn.addEventListener('click', resetTimer);
-    const editVideoBtn = document.getElementById('edit-video-btn');
-    if (editVideoBtn) editVideoBtn.addEventListener('click', () => { /* optional custom logic */ });
-    if (timerSettingsBtn) timerSettingsBtn.addEventListener('click', () => {
-        if (!timerCustomization) return;
-        // Prefill with current default minutes for convenience
-        if (customTimeInput) {
-            const mins = Math.max(1, Math.round((appState.timer.defaultTime || 1500) / 60));
-            customTimeInput.value = String(mins);
-        }
-        timerCustomization.classList.toggle('hidden');
-    });
-    if (setTimeBtn) setTimeBtn.addEventListener('click', () => {
-        if (!customTimeInput) return;
-        const minutes = parseInt(customTimeInput.value, 10);
-        if (Number.isNaN(minutes) || minutes <= 0) {
-            alert('Please enter a valid positive number of minutes.');
-            return;
-        }
-        const secs = minutes * 60;
-        appState.timer.defaultTime = secs;
-        // Apply immediately and ensure we're in work mode for clarity
-        appState.timer.mode = 'work';
-        appState.timer.isRunning = false;
-        appState.timer.timeLeft = secs;
-        if (appState.timer.intervalId) {
-            clearInterval(appState.timer.intervalId);
-            appState.timer.intervalId = null;
-        }
-        updateTimerDisplay();
-        saveTimerState();
-        if (timerCustomization) timerCustomization.classList.add('hidden');
+    // Customize Course Modal logic (simplified with direct id)
+    const customizeCourseBtn = document.getElementById('customize-course-btn');
+    const customizeModal = document.getElementById('customize-modal');
+    const customizeOverlay = document.getElementById('customize-overlay');
+    const customizeClose = document.getElementById('customize-close');
+    const customizeCancel = document.getElementById('customize-cancel');
+    const customizeForm = document.getElementById('customize-form');
+
+    function openCustomize() {
+        if (!customizeModal || !customizeOverlay) return;
+        customizeOverlay.classList.remove('hidden');
+        customizeModal.classList.remove('hidden');
+        // Focus first radio for accessibility
+        const firstRadio = customizeForm?.querySelector('input[name="difficulty"]');
+        firstRadio && firstRadio.focus();
+    }
+    function closeCustomize() {
+        customizeOverlay?.classList.add('hidden');
+        customizeModal?.classList.add('hidden');
+    }
+    if (customizeCourseBtn) customizeCourseBtn.addEventListener('click', openCustomize);
+    customizeClose?.addEventListener('click', closeCustomize);
+    customizeCancel?.addEventListener('click', closeCustomize);
+    customizeOverlay?.addEventListener('click', (e) => { if (e.target === customizeOverlay) closeCustomize(); });
+    customizeForm?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const fd = new FormData(customizeForm);
+        const difficulty = fd.get('difficulty');
+        const length = fd.get('length');
+        console.log('Customize selections:', { difficulty, length });
+        closeCustomize();
+        // Placeholder: hook into generation logic later if needed
     });
     document.getElementById('syllabus-container').addEventListener('click', (e) => {
         const lessonItem = e.target.closest('.lesson-item');
@@ -710,6 +704,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const timerCustomization = document.getElementById('timer-customization');
     const customTimeInput = document.getElementById('custom-time-input');
     const setTimeBtn = document.getElementById('set-time-btn');
+
+    // Attach timer-related event listeners now that all elements & helper vars exist
+    (function initTimerUI(){
+        const editVideoBtn = document.getElementById('edit-video-btn');
+        if (editVideoBtn) editVideoBtn.addEventListener('click', () => {});
+        if (startBtn) startBtn.addEventListener('click', startTimer);
+        if (pauseBtn) pauseBtn.addEventListener('click', pauseTimer);
+        if (resetBtn) resetBtn.addEventListener('click', resetTimer);
+        if (timerSettingsBtn) timerSettingsBtn.addEventListener('click', () => {
+            if (!timerCustomization) return;
+            if (customTimeInput) {
+                const mins = Math.max(1, Math.round((appState.timer.defaultTime || 1500) / 60));
+                customTimeInput.value = String(mins);
+            }
+            timerCustomization.classList.toggle('hidden');
+        });
+        if (setTimeBtn) setTimeBtn.addEventListener('click', () => {
+            if (!customTimeInput) return;
+            const minutes = parseInt(customTimeInput.value, 10);
+            if (Number.isNaN(minutes) || minutes <= 0) {
+                alert('Please enter a valid positive number of minutes.');
+                return;
+            }
+            const secs = minutes * 60;
+            appState.timer.defaultTime = secs;
+            appState.timer.mode = 'work';
+            appState.timer.isRunning = false;
+            appState.timer.timeLeft = secs;
+            if (appState.timer.intervalId) {
+                clearInterval(appState.timer.intervalId);
+                appState.timer.intervalId = null;
+            }
+            updateTimerDisplay();
+            saveTimerState();
+            if (timerCustomization) timerCustomization.classList.add('hidden');
+        });
+    })();
 
     function formatTime(sec) {
         const m = Math.floor(sec / 60).toString().padStart(2, '0');

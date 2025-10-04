@@ -187,7 +187,7 @@
                                 <div class="custom-shadow center" style="flex-direction:column; padding:1rem;">
                                     <h3 class="font-bold text-lg mb-3">Course Management</h3>
                                     <button class="w-full btn btn-premium mb-2">Upgrade to Premium</button>
-                                    <button class="w-full btn btn-secondary">Customize Course</button>
+                                    <button id="customize-course-btn" type="button" class="w-full btn btn-secondary">Customize Course</button>
                                 </div>
                             </div>
                         </aside>
@@ -258,6 +258,37 @@
             </div>
         </footer>
     </div>
+    </div>
+
+    <!-- Customize Course Modal & Overlay -->
+    <div id="customize-overlay" class="ic-overlay hidden"></div>
+    <div id="customize-modal" class="ic-modal hidden" role="dialog" aria-modal="true" aria-labelledby="customize-title">
+        <div class="ic-modal-header">
+            <h2 id="customize-title" class="section-title" style="font-size:1.25rem;">Customize Your Learning Path</h2>
+            <button type="button" id="customize-close" class="ic-close-btn" aria-label="Close">&times;</button>
+        </div>
+        <form id="customize-form" class="ic-modal-body">
+            <fieldset class="ic-fieldset">
+                <legend class="ic-legend">Select Difficulty</legend>
+                <div class="ic-radio-grid">
+                    <label class="ic-radio"><input type="radio" name="difficulty" value="beginner" checked> Beginner</label>
+                    <label class="ic-radio"><input type="radio" name="difficulty" value="intermediate"> Intermediate</label>
+                    <label class="ic-radio"><input type="radio" name="difficulty" value="advanced"> Advanced</label>
+                </div>
+            </fieldset>
+            <fieldset class="ic-fieldset" style="margin-top:1rem;">
+                <legend class="ic-legend">Preferred Course Length</legend>
+                <div class="ic-radio-grid">
+                    <label class="ic-radio"><input type="radio" name="length" value="short" checked> Short (1-3 hours)</label>
+                    <label class="ic-radio"><input type="radio" name="length" value="medium"> Medium (4-8 hours)</label>
+                    <label class="ic-radio"><input type="radio" name="length" value="long"> Long (8+ hours)</label>
+                </div>
+            </fieldset>
+            <div class="ic-modal-actions">
+                <button type="submit" class="btn btn-primary" id="customize-apply">Apply Changes</button>
+                <button type="button" class="btn btn-secondary" id="customize-cancel">Cancel</button>
+            </div>
+        </form>
     </div>
 
     <script src="app.js"></script>
