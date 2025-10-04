@@ -557,10 +557,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('create-new-course-btn').addEventListener('click', () => switchView('generator'));
     tabButtons.notes.addEventListener('click', () => switchTab('notes'));
     tabButtons.projects.addEventListener('click', () => switchTab('projects'));
-    document.getElementById('timer-start').addEventListener('click', startTimer);
-    document.getElementById('timer-pause').addEventListener('click', pauseTimer);
-    document.getElementById('timer-reset').addEventListener('click', resetTimer);
-    document.getElementById('edit-video-btn').addEventListener('click', () => { /* optional custom logic */ });
+    // Timer button listeners: ensure elements exist before attaching
+    const timerStartBtn = document.getElementById('timer-start');
+    const timerPauseBtn = document.getElementById('timer-pause');
+    const timerResetBtn = document.getElementById('timer-reset');
+    if (timerStartBtn) timerStartBtn.addEventListener('click', startTimer);
+    if (timerPauseBtn) timerPauseBtn.addEventListener('click', pauseTimer);
+    if (timerResetBtn) timerResetBtn.addEventListener('click', resetTimer);
+    const editVideoBtn = document.getElementById('edit-video-btn');
+    if (editVideoBtn) editVideoBtn.addEventListener('click', () => { /* optional custom logic */ });
     if (timerSettingsBtn) timerSettingsBtn.addEventListener('click', () => {
         if (!timerCustomization) return;
         // Prefill with current default minutes for convenience
