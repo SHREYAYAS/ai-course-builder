@@ -583,6 +583,10 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.timer.mode = 'work';
         appState.timer.isRunning = false;
         appState.timer.timeLeft = secs;
+        if (appState.timer.intervalId) {
+            clearInterval(appState.timer.intervalId);
+            appState.timer.intervalId = null;
+        }
         updateTimerDisplay();
         saveTimerState();
         if (timerCustomization) timerCustomization.classList.add('hidden');
@@ -763,21 +767,32 @@ document.addEventListener('DOMContentLoaded', () => {
     function startTimer() {
         if (appState.timer.isRunning) return;
         appState.timer.isRunning = true;
-        if (!appState.timer.intervalId) {
-            appState.timer.intervalId = setInterval(tick, 1000);
+        // Always clear any previous interval to avoid multiple timers
+        if (appState.timer.intervalId) {
+            clearInterval(appState.timer.intervalId);
+            appState.timer.intervalId = null;
         }
+        appState.timer.intervalId = setInterval(tick, 1000);
         updateTimerDisplay();
         saveTimerState();
     }
 
     function pauseTimer() {
         appState.timer.isRunning = false;
+        if (appState.timer.intervalId) {
+            clearInterval(appState.timer.intervalId);
+            appState.timer.intervalId = null;
+        }
         updateTimerDisplay();
         saveTimerState();
     }
 
     function resetTimer() {
         appState.timer.isRunning = false;
+        if (appState.timer.intervalId) {
+            clearInterval(appState.timer.intervalId);
+            appState.timer.intervalId = null;
+        }
         if (appState.timer.mode === 'work') {
             appState.timer.timeLeft = appState.timer.defaultTime;
         } else {
