@@ -254,6 +254,29 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('course-title-sidebar').textContent = appState.currentCourse.title;
         renderSyllabus(appState.currentCourse);
         updateCourseProgress(appState.currentCourse);
+        // Show customization meta if available
+        try {
+            const metaBarId = 'course-meta-bar';
+            let metaBar = document.getElementById(metaBarId);
+            if (!metaBar) {
+                metaBar = document.createElement('div');
+                metaBar.id = metaBarId;
+                metaBar.className = 'text-xs mt-1 mb-2 px-2 py-1 rounded bg-gray-100 text-gray-600 flex gap-3 items-center';
+                const headerEl = document.getElementById('course-title-sidebar').parentElement;
+                headerEl && headerEl.appendChild(metaBar);
+            }
+            const d = (course.meta && course.meta.difficulty) ? course.meta.difficulty : (appState.customization && appState.customization.difficulty);
+            const l = (course.meta && course.meta.length) ? course.meta.length : (appState.customization && appState.customization.length);
+            if (d || l) {
+                metaBar.innerHTML = `
+                    ${d ? `<span class="inline-flex items-center gap-1"><strong>Level:</strong> ${String(d).charAt(0).toUpperCase() + String(d).slice(1)}</span>` : ''}
+                    ${l ? `<span class="inline-flex items-center gap-1"><strong>Length:</strong> ${String(l).charAt(0).toUpperCase() + String(l).slice(1)}</span>` : ''}
+                `;
+                metaBar.classList.remove('hidden');
+            } else {
+                metaBar.classList.add('hidden');
+            }
+        } catch (_) { /* non-fatal */ }
         // Auto-open last active lesson if available, else first
         const ai = course?.activeLesson;
         const mIndex = (ai && Number.isInteger(ai.moduleIndex)) ? ai.moduleIndex : 0;
@@ -395,11 +418,12 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingIndicator.classList.remove('hidden');
 
         try {
+            const customization = appState.customization || loadFromLocal('intelli:customization') || null;
             let response = await fetch(`${API_BASE}/generate-course`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 // Send topic and userId when available
-                body: JSON.stringify({ topic: topic, userId: (appState.user && appState.user.uid) || null }),
+                body: JSON.stringify({ topic: topic, userId: (appState.user && appState.user.uid) || null, options: customization }),
             });
 
             // Fallback: some versions/routes used /api/generate-course
@@ -408,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 response = await fetch(`${API_BASE}/api/generate-course`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ topic: topic, userId: (appState.user && appState.user.uid) || null }),
+                    body: JSON.stringify({ topic: topic, userId: (appState.user && appState.user.uid) || null, options: customization }),
                 });
             }
 
@@ -587,6 +611,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const difficulty = fd.get('difficulty');
         const length = fd.get('length');
         console.log('Customize selections:', { difficulty, length });
+        appState.customization = { difficulty, length, ts: Date.now() };
+        // Persist locally so next session retains last choice
+        saveToLocal('intelli:customization', appState.customization);
         closeCustomize();
         // Placeholder: hook into generation logic later if needed
     });

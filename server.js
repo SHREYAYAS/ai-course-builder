@@ -143,11 +143,12 @@ app.get('/debug/env', (_req, res) => {
 async function generateCourseHandler(req, res) {
   const topic = (req.body && req.body.topic) || '';
   const userId = (req.body && req.body.userId) || null;
+  const options = (req.body && req.body.options) || null; // {difficulty,length}
   if (!topic || typeof topic !== 'string') {
     return res.status(400).json({ error: 'Topic is required' });
   }
   try {
-    const course = await generateCourseWithAI(topic);
+  const course = await generateCourseWithAI(topic, options);
     if (!course) return res.status(500).json({ error: 'Failed to generate course from AI.' });
 
     // Server-side save if Firestore and userId are available
@@ -218,25 +219,45 @@ app.post('/courses/:courseId/complete', async (req, res) => {
   }
 });
 
-// Start server
-app.listen(port, () => {
-  console.log(`IntelliCourse server listening at http://localhost:${port}`);
-  if (!process.env.GEMINI_API_KEY) {
-    console.warn('Warning: GEMINI_API_KEY is not set. The app will use fallback data. Add it to your .env to enable real AI.');
-  }
-  // Optional: quick model discovery summary on startup
-  (async () => {
-    try {
-      if (process.env.GEMINI_API_KEY) {
-        const models = await listAvailableModelsRest();
-        const usable = models.filter(
-          (m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent')
-        );
-        console.log(`[Gemini] Discovered ${models.length} models; usable for generateContent: ${usable.length}`);
-        if (usable.length) console.log('[Gemini] Example usable models:', usable.slice(0, 5).map((m) => m.name).join(', '));
-      }
-    } catch (e) {
-      console.warn('Model discovery at startup failed:', String(e));
+// Start server with automatic fallback if port is busy
+function startServer(desiredPort, attempt = 0) {
+  const maxAttempts = 5;
+  const srv = app.listen(desiredPort, () => {
+    console.log(`IntelliCourse server listening at http://localhost:${desiredPort}`);
+    if (!process.env.GEMINI_API_KEY) {
+      console.warn('Warning: GEMINI_API_KEY is not set. The app will use fallback data. Add it to your .env to enable real AI.');
     }
-  })();
-});
+    (async () => {
+      try {
+        if (process.env.GEMINI_API_KEY) {
+          const models = await listAvailableModelsRest();
+          const usable = models.filter(
+            (m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent')
+          );
+            console.log(`[Gemini] Discovered ${models.length} models; usable for generateContent: ${usable.length}`);
+            if (usable.length) console.log('[Gemini] Example usable models:', usable.slice(0, 5).map((m) => m.name).join(', '));
+        }
+      } catch (e) {
+        console.warn('Model discovery at startup failed:', String(e));
+      }
+    })();
+  });
+  srv.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`[Server] Port ${desiredPort} in use.`);
+      if (attempt < maxAttempts) {
+        const nextPort = Number(desiredPort) + 1;
+        console.log(`[Server] Retrying on port ${nextPort} (attempt ${attempt + 1}/${maxAttempts})...`);
+        setTimeout(() => startServer(nextPort, attempt + 1), 300);
+      } else {
+        console.error('[Server] Exhausted port retry attempts. Exiting.');
+        process.exit(1);
+      }
+    } else {
+      console.error('[Server] Failed to start:', err);
+      process.exit(1);
+    }
+  });
+}
+
+startServer(port);
