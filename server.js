@@ -61,6 +61,7 @@ const {
   getSelectedModel,
   getYouTubeStatus,
   generatePremiumSuggestions,
+  generateQuizFromLessonGemini,
 } = require('./ai-service');
 
 // Create app
@@ -194,6 +195,21 @@ app.post('/api/premium-courses', async (req, res) => {
   } catch (e) {
     console.error('Premium suggestions error:', e);
     res.status(500).json({ error: 'Failed to get premium suggestions' });
+  }
+});
+
+// Generate a 3-question multiple-choice quiz from lessonContent
+app.post('/api/generate-quiz', async (req, res) => {
+  const lessonContent = req.body && req.body.lessonContent;
+  if (!lessonContent || typeof lessonContent !== 'string') {
+    return res.status(400).json({ error: 'lessonContent must be a non-empty string' });
+  }
+  try {
+    const { quiz, source, reason } = await generateQuizFromLessonGemini(lessonContent);
+    res.json({ quiz, source, reason: reason || undefined });
+  } catch (e) {
+    console.error('[Quiz] generation failed:', e);
+    res.status(500).json({ error: 'Failed to generate quiz' });
   }
 });
 

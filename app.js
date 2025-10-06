@@ -752,6 +752,116 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchPremium(topic);
     });
 
+    // --- Quiz Feature ---
+    const quizOpenBtn = document.getElementById('quiz-open-btn');
+    const quizOverlay = document.getElementById('quiz-overlay');
+    const quizModal = document.getElementById('quiz-modal');
+    const quizClose = document.getElementById('quiz-close');
+    const quizQuestionsEl = document.getElementById('quiz-questions');
+    const quizLoading = document.getElementById('quiz-loading');
+    const quizError = document.getElementById('quiz-error');
+    const quizResults = document.getElementById('quiz-results');
+    const quizSubmit = document.getElementById('quiz-submit');
+    const quizRegenerate = document.getElementById('quiz-regenerate');
+
+    let quizState = { answers: {}, correct: [], source: null };
+
+    function openQuiz(){
+        if(!quizOverlay||!quizModal) return; 
+        quizOverlay.classList.remove('hidden');
+        quizModal.classList.remove('hidden');
+        startQuizGeneration();
+    }
+    function closeQuiz(){
+        quizOverlay?.classList.add('hidden');
+        quizModal?.classList.add('hidden');
+    }
+    quizClose && quizClose.addEventListener('click', closeQuiz);
+    quizOverlay && quizOverlay.addEventListener('click', e=>{ if(e.target===quizOverlay) closeQuiz(); });
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeQuiz(); });
+
+    function getLessonContentForQuiz(){
+        // Use current notes HTML stripped to text as lessonContent; fallback to course title
+        const notesHtml = document.getElementById('content-notes')?.innerText || '';
+        if (notesHtml.trim().length > 40) return notesHtml.trim().slice(0, 6000);
+        return (appState.currentCourse?.title || 'Learning topic fundamentals');
+    }
+
+    async function startQuizGeneration(){
+        quizError.classList.add('hidden');
+        quizResults.classList.add('hidden');
+        quizSubmit.classList.add('hidden');
+        quizRegenerate.classList.add('hidden');
+        quizQuestionsEl.classList.add('hidden');
+        quizQuestionsEl.innerHTML='';
+        quizLoading.classList.remove('hidden');
+        const lessonContent = getLessonContentForQuiz();
+        try {
+            const r = await fetch(`${API_BASE}/api/generate-quiz`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ lessonContent })});
+            if(!r.ok) throw new Error('Request failed');
+            const j = await r.json();
+            renderQuiz(j.quiz || [], j.source, j.reason);
+        } catch(err){
+            quizLoading.classList.add('hidden');
+            quizError.textContent = 'Unable to generate quiz (using fallback).';
+            quizError.classList.remove('hidden');
+        }
+    }
+
+    function renderQuiz(quiz, source, reason){
+        quizState = { answers:{}, correct: quiz.map(q=>q.correctAnswer), source, reason };
+        quizLoading.classList.add('hidden');
+        if(!Array.isArray(quiz) || !quiz.length){
+            quizError.textContent = 'No quiz content available.';
+            quizError.classList.remove('hidden');
+            return;
+        }
+        quizQuestionsEl.innerHTML = quiz.map((q,i)=>{
+            const letters = ['A','B','C','D'];
+            return `<li class="quiz-question" data-index="${i}">
+                <h4>${q.question}</h4>
+                <ul class="quiz-options">${q.options.map((opt,oi)=>`<li class="quiz-option" data-opt="${encodeURIComponent(opt)}"><span class="quiz-letter">${letters[oi]}</span><span class="quiz-text flex-1">${opt}</span></li>`).join('')}</ul>
+            </li>`;
+        }).join('');
+        quizQuestionsEl.classList.remove('hidden');
+        quizSubmit.classList.remove('hidden');
+        quizRegenerate.classList.remove('hidden');
+    }
+
+    function handleQuizClick(e){
+        const opt = e.target.closest('.quiz-option');
+        if(!opt) return;
+        const qEl = opt.closest('.quiz-question');
+        const idx = Number(qEl.dataset.index);
+        // clear previous selection
+        qEl.querySelectorAll('.quiz-option').forEach(o=>o.classList.remove('selected'));
+        opt.classList.add('selected');
+        quizState.answers[idx] = decodeURIComponent(opt.dataset.opt);
+    }
+    quizQuestionsEl && quizQuestionsEl.addEventListener('click', handleQuizClick);
+
+    function gradeQuiz(){
+        const total = quizState.correct.length;
+        let score = 0;
+        quizQuestionsEl.querySelectorAll('.quiz-question').forEach((qEl,i)=>{
+            const chosen = quizState.answers[i];
+            const correct = quizState.correct[i];
+            qEl.querySelectorAll('.quiz-option').forEach(li=>{
+                const val = decodeURIComponent(li.dataset.opt);
+                if(val===correct) li.classList.add('correct');
+                if(val===chosen && val!==correct) li.classList.add('incorrect');
+                li.classList.add('disabled');
+            });
+            if(chosen===correct) score++;
+        });
+        quizSubmit.classList.add('hidden');
+        quizResults.textContent = `Score: ${score}/${total} (${Math.round((score/total)*100)}%)` + (quizState.source==='fallback' ? ' • (Fallback quiz)' : '');
+        quizResults.classList.remove('hidden');
+    }
+    quizSubmit && quizSubmit.addEventListener('click', gradeQuiz);
+    quizRegenerate && quizRegenerate.addEventListener('click', startQuizGeneration);
+    quizOpenBtn && quizOpenBtn.addEventListener('click', openQuiz);
+
     function openCustomize() {
         if (!customizeModal || !customizeOverlay) return;
         customizeOverlay.classList.remove('hidden');

@@ -399,8 +399,41 @@ Keep titles concise (max 60 chars). No markdown, only JSON.`;
     ];
 }
 
+// Gemini-based quiz generator (3 MCQs)
+async function generateQuizFromLessonGemini(lessonContent) {
+    if (!lessonContent || typeof lessonContent !== 'string') {
+        throw new Error('lessonContent must be a non-empty string');
+    }
+    const quizPrompt = `You are an expert quiz creator. Based on the following content, generate a 3-question multiple-choice quiz. Your response MUST be a valid JSON array of exactly 3 objects. Each object must have keys: "question" (string), "options" (array of 4 concise unique strings), and "correctAnswer" (a string that exactly matches one of the options). Do not include any explanation or commentary outside the JSON. Content:\n\n${lessonContent.slice(0,4000)}`;
+    try {
+        if (!API_KEY) throw new Error('Missing GEMINI_API_KEY');
+        const result = await generateWithFirstAvailableModel(quizPrompt);
+        const txt = (await result.response).text().replace(/```json|```/g,'').trim();
+        let data;
+        try { data = JSON.parse(txt); }
+        catch(_) {
+            const match = txt.match(/\[[\s\S]*\]/);
+            if (match) data = JSON.parse(match[0]); else throw new Error('Invalid JSON');
+        }
+        if (!Array.isArray(data) || data.length !== 3) throw new Error('Quiz must be array length 3');
+        for (const q of data) {
+            if (typeof q.question !== 'string') throw new Error('Invalid question');
+            if (!Array.isArray(q.options) || q.options.length !== 4) throw new Error('Options must length 4');
+            if (typeof q.correctAnswer !== 'string' || !q.options.includes(q.correctAnswer)) throw new Error('correctAnswer mismatch');
+        }
+        return { quiz: data, source: 'gemini' };
+    } catch (e) {
+        const topicLine = (lessonContent.split(/\n|\. /)[0] || 'the topic').slice(0,80);
+        return { quiz: [
+            { question:`Which statement best summarizes ${topicLine}?`, options:[`It is central to understanding ${topicLine}`,'It is unrelated','It is only UI styling','It is only about databases'], correctAnswer:`It is central to understanding ${topicLine}` },
+            { question:`What helps reinforce ${topicLine}?`, options:['Ignoring practice','Memorizing only','Applying concepts in small projects','Avoiding feedback'], correctAnswer:'Applying concepts in small projects' },
+            { question:`Common mistake when learning ${topicLine}?`, options:['Building projects','Reviewing basics periodically','Focusing only on surface examples','Seeking feedback'], correctAnswer:'Focusing only on surface examples' }
+        ], source:'fallback', reason: e.message };
+    }
+}
+
 // Export for server.js
-module.exports = { generateCourseWithAI, listAvailableModelsRest, testModelName, generatePremiumSuggestions };
+module.exports = { generateCourseWithAI, listAvailableModelsRest, testModelName, generatePremiumSuggestions, generateQuizFromLessonGemini };
 
 // Helper for diagnostics
 module.exports.getSelectedModel = function getSelectedModel() {

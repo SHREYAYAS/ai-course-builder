@@ -21,17 +21,21 @@ npm install
 
 2. Start the server (serves index.html and the API)
 ```
-npm start
-```
+ npm start
+
+### Features
+- Premium course suggestions modal with AI + graceful fallback
+- Quiz generation endpoint (`POST /api/generate-quiz`) producing a 3-question multiple-choice quiz (Gemini, with fallback)
 
 3. Open http://localhost:3000 in your browser. Use the Generate Course button.
 
 ### Troubleshooting
-- Do not double-click `index.html`. Open the site via http://localhost:3000 so the `/api/generate-course` call succeeds.
+`POST /api/generate-quiz` – Body: `{ "lessonContent": "..." }` Returns `{ quiz:[{question,options[],correctAnswer}], source:'gemini|fallback', reason? }`.
 - Port already in use: close previous node processes or change `PORT` env var.
 - Keys not loading: ensure `.env` sits next to `server.js` and the server logs show `GEMINI_API_KEY: loaded` and `YOUTUBE_API_KEY: loaded`.
 - Video not found: the UI will still show notes; try a different topic.
 
 ### Notes
 - The backend sanitizes and parses Gemini output and maps it to the structure expected by the UI.
+- Quiz generation now uses the existing Gemini key; no OpenAI key required.
 - No keys are exposed to the browser; all AI calls happen on the server.
