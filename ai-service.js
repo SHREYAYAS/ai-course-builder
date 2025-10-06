@@ -375,8 +375,32 @@ function fallbackCourse(topic) {
     };
 }
 
+// Premium course suggestion generator
+async function generatePremiumSuggestions(topic) {
+    const prompt = `Suggest 6 paid, high-quality advanced learning resources or premium structured courses related to "${topic}".
+Return JSON array. Each item must have: title, provider, format (video series | interactive | cohort | bootcamp | ebook), difficulty (intermediate|advanced|mixed), url (plausible if unknown), value (short selling point), and estHours (approx hours or range).
+Keep titles concise (max 60 chars). No markdown, only JSON.`;
+    try {
+        if (!API_KEY) throw new Error('Missing GEMINI_API_KEY');
+        const result = await generateWithFirstAvailableModel(prompt);
+        const txt = (await result.response).text().replace(/```json|```/g,'').trim();
+        const data = JSON.parse(txt);
+        if (Array.isArray(data)) return data.slice(0,6);
+    } catch (e) {
+        console.warn('Premium suggestions AI failed, using fallback:', e?.message || e);
+    }
+    return [
+        { title:`${topic} Mastery Bootcamp`, provider:'SkillPro Labs', format:'cohort', difficulty:'advanced', url:'#', value:'Intensive mentor-led deep dive', estHours:'40+' },
+        { title:`${topic} Architecture Patterns`, provider:'EduForge', format:'video series', difficulty:'advanced', url:'#', value:'Real-world scaling strategies', estHours:'12' },
+        { title:`Hands-on ${topic} Projects`, provider:'BuildX', format:'interactive', difficulty:'intermediate', url:'#', value:'Five guided portfolio builds', estHours:'18' },
+        { title:`${topic} Performance Optimization`, provider:'OptiLearn', format:'video series', difficulty:'advanced', url:'#', value:'Profiling & tuning toolkit', estHours:'9' },
+        { title:`${topic} Design Systems`, provider:'CraftSchool', format:'ebook', difficulty:'intermediate', url:'#', value:'Patterns & reusable components', estHours:'6' },
+        { title:`Elite ${topic} Interview Prep`, provider:'PrepCamp', format:'cohort', difficulty:'advanced', url:'#', value:'Scenario-based expert sessions', estHours:'25+' }
+    ];
+}
+
 // Export for server.js
-module.exports = { generateCourseWithAI, listAvailableModelsRest, testModelName };
+module.exports = { generateCourseWithAI, listAvailableModelsRest, testModelName, generatePremiumSuggestions };
 
 // Helper for diagnostics
 module.exports.getSelectedModel = function getSelectedModel() {

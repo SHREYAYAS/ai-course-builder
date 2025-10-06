@@ -103,12 +103,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Auth modal and header controls
     const authModal = document.getElementById('auth-modal');
     const appContent = document.getElementById('app-content');
-    const loginView = document.getElementById('login-view');
-    const signupView = document.getElementById('signup-view');
-    const loginForm = document.getElementById('login-form');
-    const signupForm = document.getElementById('signup-form');
-    const toSignupBtn = document.getElementById('to-signup-btn');
-    const toLoginBtn = document.getElementById('to-login-btn');
+    // New unified auth modal elements
+    const authForm = document.getElementById('auth-form');
+    const tabButtonsEls = Array.from(document.querySelectorAll('#auth-modal .tab-btn'));
     const openLoginBtn = document.getElementById('open-login-btn');
     const signoutBtn = document.getElementById('signout-btn');
     const userInfo = document.getElementById('user-info');
@@ -153,12 +150,24 @@ document.addEventListener('DOMContentLoaded', () => {
     function hide(el) { if (el) el.classList.add('hidden'); }
     function setError(msg) { if (authErrorEl) authErrorEl.textContent = msg || ''; }
     function switchAuthView(view) {
-        if (view === 'login') {
-            show(loginView); hide(signupView);
-        } else {
-            show(signupView); hide(loginView);
-        }
+        const submitBtn = document.getElementById('auth-submit');
+        const submitLabel = submitBtn?.querySelector('.submit-label');
+        const emailInput = document.getElementById('auth-email');
+        const passwordInput = document.getElementById('auth-password');
+        tabButtonsEls.forEach(btn => {
+            const active = btn.dataset.tab === view;
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+            btn.classList.toggle('bg-slate-100', active);
+            btn.classList.toggle('text-slate-800', active);
+            btn.classList.toggle('bg-slate-50', !active);
+            btn.classList.toggle('text-slate-600', !active);
+        });
+        authForm.dataset.mode = view;
+        if (submitLabel) submitLabel.textContent = view === 'signup' ? 'Create Account' : 'Continue';
+        if (passwordInput) passwordInput.value = '';
         setError('');
+        // Auto-focus email field for quick entry
+        setTimeout(() => emailInput && emailInput.focus(), 0);
     }
 
     async function handleSignUp(email, password) {
@@ -220,6 +229,110 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Attach tab switching
+    tabButtonsEls.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchAuthView(btn.dataset.tab === 'signup' ? 'signup' : 'login');
+        });
+    });
+
+    // Unified auth form submission
+    if (authForm) {
+        authForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!auth) return;
+            const mode = authForm.dataset.mode || 'login';
+            const email = document.getElementById('auth-email')?.value?.trim();
+            const password = document.getElementById('auth-password')?.value;
+            if (!email || !password) {
+                setError('Email and password required');
+                return;
+            }
+            const submitBtn = document.getElementById('auth-submit');
+            const spinner = submitBtn?.querySelector('.loading-spinner');
+            const label = submitBtn?.querySelector('.submit-label');
+            try {
+                submitBtn && (submitBtn.disabled = true);
+                spinner && spinner.classList.remove('hidden');
+                label && label.classList.add('opacity-0');
+                if (mode === 'signup') {
+                    await handleSignUp(email, password);
+                } else {
+                    await handleSignIn(email, password);
+                }
+            } finally {
+                submitBtn && (submitBtn.disabled = false);
+                spinner && spinner.classList.add('hidden');
+                label && label.classList.remove('opacity-0');
+            }
+        });
+    }
+
+    // Modal open/close wiring
+    const closeAuthBtn = document.getElementById('close-auth-btn');
+    if (openLoginBtn) openLoginBtn.addEventListener('click', () => { show(authModal); switchAuthView('login'); });
+    if (closeAuthBtn) closeAuthBtn.addEventListener('click', () => hide(authModal));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(authModal); });
+
+    // Password visibility toggle + basic strength meter
+    const togglePwdBtn = document.getElementById('toggle-password-visibility');
+    const pwdInput = document.getElementById('auth-password');
+    const strengthEl = document.getElementById('password-strength');
+    function evalStrength(p) {
+        if (!p) return '';
+        let score = 0;
+        if (p.length >= 8) score++;
+        if (/[A-Z]/.test(p)) score++;
+        if (/[0-9]/.test(p)) score++;
+        if (/[^A-Za-z0-9]/.test(p)) score++;
+        return ['weak','fair','good','strong'][score-1] || 'weak';
+    }
+    if (pwdInput) {
+        pwdInput.addEventListener('input', () => {
+            const val = pwdInput.value;
+            const s = evalStrength(val);
+            if (strengthEl) strengthEl.textContent = val ? s : '';
+        });
+    }
+    if (togglePwdBtn && pwdInput) {
+        togglePwdBtn.addEventListener('click', () => {
+            const isPw = pwdInput.type === 'password';
+            pwdInput.type = isPw ? 'text' : 'password';
+            togglePwdBtn.textContent = isPw ? 'Hide' : 'Show';
+            pwdInput.focus();
+        });
+    }
+
+    // Google sign-in
+    const googleBtn = document.getElementById('google-signin-btn');
+    if (googleBtn && auth && firebase?.auth?.GoogleAuthProvider) {
+        googleBtn.addEventListener('click', async () => {
+            setError('');
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                await auth.signInWithPopup(provider);
+            } catch (err) {
+                console.error('Google sign-in failed', err);
+                setError('Google sign-in failed');
+            }
+        });
+    }
+
+    // Focus trap inside auth modal
+    function trapFocus(e) {
+        if (!authModal || authModal.classList.contains('hidden')) return;
+        if (e.key !== 'Tab') return;
+        const focusable = authModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        const arr = Array.from(focusable).filter(el => !el.disabled && el.offsetParent !== null);
+        if (!arr.length) return;
+        const first = arr[0];
+        const last = arr[arr.length -1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    document.addEventListener('keydown', trapFocus);
 
 
     // --- 4. CORE FUNCTIONS (REFACTORED FOR FIRESTORE) ---
@@ -316,45 +429,40 @@ document.addEventListener('DOMContentLoaded', () => {
             if (courses.length === 0) {
                 grid.innerHTML = `<div class="md:col-span-3 text-center p-8 bg-gray-50 rounded-2xl"><h3 class="text-lg font-semibold">Welcome!</h3><p class="text-gray-500 mt-2">You haven't generated any courses yet. Go create one to get started!</p></div>`;
             } else {
-                 courses.forEach(course => {
+                courses.forEach(course => {
                     const card = document.createElement('div');
-                    card.className = 'bg-white rounded-2xl custom-shadow border hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex flex-col';
+                    card.className = 'course-card cursor-pointer';
                     card.dataset.courseId = course.id;
-
                     const allLessons = (course.modules || []).flatMap(m => m.lessons || []);
                     const completedLessons = allLessons.filter(l => l.completed).length;
                     const progress = allLessons.length > 0 ? Math.round((completedLessons / allLessons.length) * 100) : 0;
                     const ts = Date.parse(course.updatedAt || course.createdAt || 0) || 0;
                     const rel = formatRelativeTime(ts);
-                    const notStarted = completedLessons === 0;
-                    const done = allLessons.length > 0 && completedLessons === allLessons.length;
-                    const statusColor = done ? 'bg-green-500' : (notStarted ? 'bg-gray-300' : 'bg-amber-400');
                     const al = course.activeLesson;
                     let continueText = '';
                     if (al && Number.isInteger(al.moduleIndex) && Number.isInteger(al.lessonIndex)) {
                         const m = course.modules?.[al.moduleIndex];
                         const l = m?.lessons?.[al.lessonIndex];
                         const label = l?.title || `Module ${al.moduleIndex + 1} • Lesson ${al.lessonIndex + 1}`;
-                        continueText = `Continue: ${label}`;
+                        continueText = label;
                     }
-
                     card.innerHTML = `
-                        <div class="h-32 bg-gradient-to-br from-[#6B8A7A] to-[#8FB09B] rounded-t-2xl"></div>
-                        <div class="p-4 flex flex-col flex-grow">
-                            <div class="flex items-center gap-2 mb-2">
-                                <span class="inline-block w-2.5 h-2.5 rounded-full ${statusColor}"></span>
-                                <h3 class="font-bold text-lg flex-grow">${course.title}</h3>
+                        <div class="course-cover"></div>
+                        <div class="course-card-body">
+                            <div class="flex items-start gap-2">
+                                <div class="course-meta flex-1">${allLessons.length} lessons</div>
+                                <div class="text-[10px] text-slate-500 uppercase tracking-wider">${rel}</div>
                             </div>
-                            <p class="text-sm text-gray-500">${allLessons.length} lessons</p>
-                            ${continueText ? `<p class=\"text-xs text-gray-600 mt-0.5\">${continueText}</p>` : ''}
-                            <p class="text-xs text-gray-400 mb-2">Last opened ${rel}</p>
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-gradient-to-r from-[#6B8A7A] to-[#8FB09B] h-2 rounded-full" style="width: ${progress}%"></div>
+                            <h3 class="font-semibold tracking-tight text-lg leading-snug">${course.title}</h3>
+                            ${continueText ? `<p class="continue-text">Continue: ${continueText}</p>` : ''}
+                            <div class="course-progress-track mt-2">
+                                <div class="course-progress-bar" style="width:${progress}%;"></div>
                             </div>
-                            <p class="text-xs text-gray-500 mt-1 self-end">${progress}% Complete</p>
-                            <button class="resume-course-btn btn btn-secondary mt-3 w-fit">Resume</button>
-                        </div>
-                    `;
+                            <div class="flex items-center justify-between mt-2 text-[11px] text-slate-500">
+                                <span>${progress}% Complete</span>
+                                <button class="resume-course-btn btn btn-secondary btn-xs" style="padding:.4rem .65rem; font-size:.65rem;">Resume</button>
+                            </div>
+                        </div>`;
                     grid.appendChild(card);
                 });
             }
@@ -373,20 +481,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (localCourse) {
                 grid.innerHTML = '';
                 const card = document.createElement('div');
-                card.className = 'bg-white rounded-2xl custom-shadow border hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex flex-col';
+                card.className = 'course-card cursor-pointer';
                 card.dataset.courseId = localCourse.id || 'local';
                 const allLessons = (localCourse.modules || []).flatMap(m => m.lessons || []);
                 const completedLessons = allLessons.filter(l => l.completed).length;
                 const progress = allLessons.length ? Math.round((completedLessons / allLessons.length) * 100) : 0;
                 card.innerHTML = `
-                    <div class="h-32 bg-gradient-to-br from-[#6B8A7A] to-[#8FB09B] rounded-t-2xl"></div>
-                    <div class="p-4 flex flex-col flex-grow">
-                        <h3 class="font-bold text-lg mb-2 flex-grow">${localCourse.title || 'Resume Last Course'}</h3>
-                        <p class="text-sm text-gray-500 mb-3">${allLessons.length} lessons</p>
-                        <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div class="bg-gradient-to-r from-[#6B8A7A] to-[#8FB09B] h-2 rounded-full" style="width: ${progress}%"></div>
+                    <div class="course-cover"></div>
+                    <div class="course-card-body">
+                        <div class="course-meta">${allLessons.length} lessons</div>
+                        <h3 class="font-semibold tracking-tight text-lg leading-snug mt-1">${localCourse.title || 'Resume Last Course'}</h3>
+                        <div class="course-progress-track mt-3">
+                            <div class="course-progress-bar" style="width:${progress}%"></div>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1 self-end">${progress}% Complete</p>
+                        <div class="flex items-center justify-between mt-2 text-[11px] text-slate-500">
+                            <span>${progress}% Complete</span>
+                            <button class="resume-course-btn btn btn-secondary" style="padding:.4rem .65rem; font-size:.65rem;">Open</button>
+                        </div>
                     </div>`;
                 card.addEventListener('click', () => loadCourse(localCourse));
                 grid.appendChild(card);
@@ -551,24 +662,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event Listeners ---
     document.getElementById('home-logo').addEventListener('click', () => switchView('generator'));
     document.getElementById('dashboard-btn').addEventListener('click', () => { switchView('dashboard'); });
-    // Auth form event listeners
-    if (loginForm) loginForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const email = document.getElementById('login-email').value.trim();
-        const password = document.getElementById('login-password').value;
-        handleSignIn(email, password);
-    });
-    if (signupForm) signupForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const email = document.getElementById('signup-email').value.trim();
-        const password = document.getElementById('signup-password').value;
-        handleSignUp(email, password);
-    });
-    if (toSignupBtn) toSignupBtn.addEventListener('click', () => switchAuthView('signup'));
-    if (toLoginBtn) toLoginBtn.addEventListener('click', () => switchAuthView('login'));
-    if (openLoginBtn) openLoginBtn.addEventListener('click', () => {
-        switchAuthView('login'); show(authModal);
-    });
+    // (Legacy standalone auth forms removed; unified auth modal handles submission & tab switching earlier.)
     if (signoutBtn) signoutBtn.addEventListener('click', () => handleSignOut());
     // Auth form event listeners removed
     if (resumeBtn) {
@@ -588,6 +682,75 @@ document.addEventListener('DOMContentLoaded', () => {
     const customizeClose = document.getElementById('customize-close');
     const customizeCancel = document.getElementById('customize-cancel');
     const customizeForm = document.getElementById('customize-form');
+    // Premium modal elements
+    const premiumBtn = document.querySelector('.btn.btn-premium');
+    const premiumModal = document.getElementById('premium-modal');
+    const premiumOverlay = document.getElementById('premium-overlay');
+    const premiumClose = document.getElementById('premium-close');
+    const premiumList = document.getElementById('premium-list');
+    const premiumLoading = document.getElementById('premium-loading');
+    const premiumError = document.getElementById('premium-error');
+    const premiumRegenerate = document.getElementById('premium-regenerate');
+
+    function openPremium() { if(!premiumModal||!premiumOverlay) return; premiumOverlay.classList.remove('hidden'); premiumModal.classList.remove('hidden'); }
+    function closePremium() { premiumOverlay?.classList.add('hidden'); premiumModal?.classList.add('hidden'); }
+    premiumClose && premiumClose.addEventListener('click', closePremium);
+    premiumOverlay && premiumOverlay.addEventListener('click', closePremium);
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') closePremium(); });
+
+    function premiumFallback(topic){
+        return [
+            { title:`${topic} Elite Bootcamp`, format:'cohort', difficulty:'advanced', value:'Mentor-led deep dive with capstone', estHours:'40+', url:'#' },
+            { title:`${topic} Systems Mastery`, format:'video series', difficulty:'advanced', value:'Architecture & scaling playbook', estHours:'10', url:'#' },
+            { title:`${topic} Interactive Labs`, format:'interactive', difficulty:'mixed', value:'Hands-on guided challenge sets', estHours:'15', url:'#' },
+            { title:`${topic} Performance Tuning`, format:'video series', difficulty:'advanced', value:'Profiling, optimization patterns', estHours:'8', url:'#' },
+            { title:`Production ${topic} Projects`, format:'interactive', difficulty:'intermediate', value:'Portfolio-grade build sprints', estHours:'18', url:'#' },
+            { title:`${topic} Interview Accelerator`, format:'cohort', difficulty:'advanced', value:'Scenario & mock interview loops', estHours:'25+', url:'#' }
+        ];
+    }
+    function renderPremium(items){
+        premiumList.innerHTML = items.map(it=>`<li><div class=\"flex items-start gap-2\"><span class=\"premium-badge\">${(it.difficulty||'premium').slice(0,12)}</span><div class=\"premium-meta flex-1 justify-end text-right\">${it.format||''}</div></div><p class=\"premium-title\">${it.title}</p><div class=\"premium-value\">${it.value||''}</div><div class=\"premium-hours\">~${it.estHours||''}</div><a class=\"premium-link\" href=\"${it.url||'#'}\" target=\"_blank\" rel=\"noopener\">View</a></li>`).join('');
+    }
+    async function fetchPremium(topic){
+        premiumError.classList.add('hidden');
+        premiumList.classList.add('hidden');
+        premiumLoading.classList.remove('hidden');
+        premiumList.innerHTML='';
+        const endpoint = `${API_BASE}/api/premium-courses`;
+        try {
+            const r = await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic})});
+            if(!r.ok) throw new Error('bad status '+r.status);
+            const j = await r.json();
+            let items = Array.isArray(j.suggestions)? j.suggestions : [];
+            if(!items.length) items = premiumFallback(topic);
+            renderPremium(items);
+            premiumLoading.classList.add('hidden');
+            premiumList.classList.remove('hidden');
+        } catch(err){
+            renderPremium(premiumFallback(topic));
+            premiumLoading.classList.add('hidden');
+            premiumList.classList.remove('hidden');
+            premiumError.textContent = 'Live suggestions unavailable. Showing fallback list.';
+            premiumError.classList.remove('hidden');
+        }
+    }
+
+    function resolveCurrentTopic(){
+        // Prefer current course title, else textbox
+        if(appState.currentCourse?.title) return appState.currentCourse.title.replace(/Course$/i,'').trim();
+        const raw = document.getElementById('topic-input')?.value?.trim();
+        return raw || 'Learning';
+    }
+
+    premiumBtn && premiumBtn.addEventListener('click', () => {
+        openPremium();
+        const topic = resolveCurrentTopic();
+        fetchPremium(topic);
+    });
+    premiumRegenerate && premiumRegenerate.addEventListener('click', ()=>{
+        const topic = resolveCurrentTopic();
+        fetchPremium(topic);
+    });
 
     function openCustomize() {
         if (!customizeModal || !customizeOverlay) return;
@@ -645,16 +808,15 @@ document.addEventListener('DOMContentLoaded', () => {
         (course.modules || []).forEach((module, moduleIndex) => {
             const moduleEl = document.createElement('div');
             const lessonsHtml = (module.lessons || []).map((lesson, lessonIndex) => {
-                const isPaidAndLocked = lesson.type === 'paid' && false; // no premium gating on client
+                const isPaidAndLocked = lesson.type === 'paid' && false; // placeholder for future gating
                 const icon = isPaidAndLocked
-                    ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" /></svg>'
-                    : '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>';
+                    ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" /></svg>'
+                    : '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>';
                 return `
-                    <li data-module-index="${moduleIndex}" data-lesson-index="${lessonIndex}" class="lesson-item cursor-pointer p-3 rounded-xl border-l-4 hover:bg-gray-100 flex items-center gap-3 ${isPaidAndLocked ? 'paid-lesson' : ''}">
+                    <li data-module-index="${moduleIndex}" data-lesson-index="${lessonIndex}" class="lesson-item ${isPaidAndLocked ? 'paid-lesson' : ''}">
                         ${icon}
-                        <span class="flex-grow text-sm font-medium">${lesson.title}</span>
-                    </li>
-                `;
+                        <span class="flex-grow font-medium tracking-tight">${lesson.title}</span>
+                    </li>`;
             }).join('');
             moduleEl.innerHTML = `
                 <h3 class="font-bold text-md mb-2 px-2">${module.title}</h3>

@@ -60,6 +60,7 @@ const {
   testModelName,
   getSelectedModel,
   getYouTubeStatus,
+  generatePremiumSuggestions,
 } = require('./ai-service');
 
 // Create app
@@ -182,6 +183,19 @@ async function generateCourseHandler(req, res) {
 // Generate course via AI service (support both paths used by frontend)
 app.post('/generate-course', generateCourseHandler);
 app.post('/api/generate-course', generateCourseHandler);
+
+// Premium course suggestions
+app.post('/api/premium-courses', async (req, res) => {
+  const topic = (req.body && req.body.topic) || '';
+  if (!topic) return res.status(400).json({ error: 'topic required' });
+  try {
+    const suggestions = await generatePremiumSuggestions(topic);
+    res.json({ topic, suggestions });
+  } catch (e) {
+    console.error('Premium suggestions error:', e);
+    res.status(500).json({ error: 'Failed to get premium suggestions' });
+  }
+});
 
 // Mark a lesson as complete for a user's course
 app.post('/courses/:courseId/complete', async (req, res) => {
