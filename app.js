@@ -6,6 +6,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Compute API base so it works when opening index.html directly (file://)
     const API_BASE = location.protocol === 'file:' ? 'http://localhost:3000' : '';
 
+    // Parse start view from URL (e.g., /?view=dashboard)
+    let START_VIEW = null;
+    try {
+        const params = new URLSearchParams(location.search);
+        const v = (params.get('view') || '').toLowerCase();
+        if (v === 'dashboard') START_VIEW = 'dashboard';
+    } catch (_) {}
+
     // Quick backend ping to help users see if server is up
     (async () => {
         try {
@@ -80,7 +88,8 @@ document.addEventListener('DOMContentLoaded', () => {
             timeLeft: 25 * 60,
             isRunning: false,
             defaultTime: 25 * 60,
-        }
+        },
+        forcedStartView: START_VIEW
     };
 
     // LocalStorage helpers (fallback persistence when no auth/DB)
@@ -88,7 +97,8 @@ document.addEventListener('DOMContentLoaded', () => {
         lastCourse: 'intelli:lastCourse',
         lastUserId: 'intelli:lastUserId',
         timer: 'intelli:timer',
-        streak: 'intelli:streak'
+        streak: 'intelli:streak',
+        study: 'intelli:study'
     };
     const saveToLocal = (key, value) => {
         try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
@@ -99,6 +109,106 @@ document.addEventListener('DOMContentLoaded', () => {
             return raw ? JSON.parse(raw) : null;
         } catch (_) { return null; }
     };
+
+    // --- Toast system ---
+    function ensureToastContainer() {
+        let c = document.getElementById('toast-container');
+        if (!c) {
+            c = document.createElement('div');
+            c.id = 'toast-container';
+            c.className = 'toast-container';
+            document.body.appendChild(c);
+        }
+        return c;
+    }
+    function showToast({ title = 'Nice!', text = '', icon = '🔥', timeout = 3500 } = {}) {
+        const container = ensureToastContainer();
+        const el = document.createElement('div');
+        el.className = 'toast';
+        el.setAttribute('role', 'status');
+        el.setAttribute('aria-live', 'polite');
+        el.innerHTML = `
+            <span class="toast-icon" aria-hidden="true">${icon}</span>
+            <span class="toast-title">${title}</span>
+            <span class="toast-text">${text}</span>
+            <button class="toast-close" aria-label="Dismiss">×</button>
+        `;
+        const closeBtn = el.querySelector('.toast-close');
+        const remove = () => {
+            el.classList.remove('show');
+            setTimeout(() => el.remove(), 250);
+        };
+        closeBtn.addEventListener('click', remove);
+        container.appendChild(el);
+        // animate in
+        requestAnimationFrame(() => el.classList.add('show'));
+        if (timeout > 0) setTimeout(remove, timeout);
+        return el;
+    }
+
+    // --- Study Hours (Today) helpers ---
+    function getStudyState() {
+        const data = loadFromLocal(LS_KEYS.study) || {};
+        const key = todayKey();
+        const sec = typeof data[key] === 'number' ? data[key] : 0;
+        return { map: data, key, sec };
+    }
+
+    function setStudySecondsForToday(seconds) {
+        const s = getStudyState();
+        s.map[s.key] = Math.max(0, Math.floor(seconds));
+        saveToLocal(LS_KEYS.study, s.map);
+        updateStudyHoursUI(s.map[s.key]);
+    }
+
+    function addStudySeconds(delta = 1) {
+        const s = getStudyState();
+        s.map[s.key] = Math.max(0, Math.floor((s.map[s.key] || 0) + delta));
+        saveToLocal(LS_KEYS.study, s.map);
+        updateStudyHoursUI(s.map[s.key]);
+    }
+
+    function formatHours(minsFloat) {
+        if (minsFloat >= 60) {
+            const h = minsFloat / 60;
+            return `${h.toFixed(1)}h`;
+        }
+        return `${Math.round(minsFloat)}m`;
+    }
+
+    function updateStudyHoursUI(seconds) {
+        const el = document.getElementById('study-hours');
+        if (!el) return;
+        const mins = seconds / 60;
+        el.textContent = formatHours(mins);
+        const exact = Math.round(mins);
+        el.title = `${exact} minutes today`;
+        el.setAttribute('aria-label', `${exact} minutes today`);
+        // Also refresh weekly stat when today's value changes
+        try { updateWeeklyHoursStat(); } catch (_) {}
+    }
+
+    function updateWeeklyHoursStat() {
+        const map = loadFromLocal(LS_KEYS.study) || {};
+        // Sum the last 7 days including today
+        const now = new Date();
+        let totalSec = 0;
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(now);
+            d.setDate(now.getDate() - i);
+            const y = d.getFullYear();
+            const m = (d.getMonth() + 1).toString().padStart(2, '0');
+            const day = d.getDate().toString().padStart(2, '0');
+            const key = `${y}-${m}-${day}`;
+            totalSec += typeof map[key] === 'number' ? map[key] : 0;
+        }
+        const el = document.getElementById('stat-weekly-hours');
+        if (!el) return;
+        const hours = totalSec / 3600;
+        el.textContent = `${hours.toFixed(hours >= 10 ? 0 : 1)}h`;
+        el.title = `${Math.round(totalSec/60)} minutes (last 7 days)`;
+        el.setAttribute('aria-label', `${Math.round(totalSec/60)} minutes in the last 7 days`);
+    }
 
     // Auth modal and header controls
     const authModal = document.getElementById('auth-modal');
@@ -129,6 +239,8 @@ document.addEventListener('DOMContentLoaded', () => {
         projects: document.getElementById('content-projects')
     };
     const userStatusText = document.getElementById('user-status-text');
+    // Pending link info when user tries to sign up with an email that exists via Google
+    let pendingLink = null; // { email, password, provider: 'google.com' }
     function formatRelativeTime(ts) {
         if (!ts) return 'just now';
         const diff = Date.now() - ts;
@@ -149,6 +261,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function show(el) { if (el) el.classList.remove('hidden'); }
     function hide(el) { if (el) el.classList.add('hidden'); }
     function setError(msg) { if (authErrorEl) authErrorEl.textContent = msg || ''; }
+
+    function mapAuthError(err, ctx) {
+        const code = (err && (err.code || err.message || '')).toString();
+        if (code.includes('auth/email-already-in-use')) {
+            return 'This email is already registered. Try Login. If you used Google before, click “Continue with Google”.';
+        }
+        if (code.includes('auth/invalid-email')) return 'Please enter a valid email address.';
+        if (code.includes('auth/weak-password')) return 'Use a stronger password (at least 6 characters).';
+        if (code.includes('auth/wrong-password')) return 'Incorrect password. Try again or reset it.';
+        if (code.includes('auth/user-not-found')) return 'No account found. Try Sign Up first.';
+        if (code.includes('auth/popup-closed-by-user')) return 'Popup closed. Please try again.';
+        return (err && err.message) ? err.message : (ctx === 'signup' ? 'Sign up failed' : 'Sign in failed');
+    }
     function switchAuthView(view) {
         const submitBtn = document.getElementById('auth-submit');
         const submitLabel = submitBtn?.querySelector('.submit-label');
@@ -176,7 +301,28 @@ document.addEventListener('DOMContentLoaded', () => {
             await auth.createUserWithEmailAndPassword(email, password);
         } catch (e) {
             console.error('Sign up failed:', e);
-            setError(e && e.message ? e.message : 'Sign up failed');
+            // If email exists, guide user based on sign-in methods
+            if (e && e.code === 'auth/email-already-in-use' && auth?.fetchSignInMethodsForEmail) {
+                try {
+                    const methods = await auth.fetchSignInMethodsForEmail(email);
+                    if (methods && methods.includes('password')) {
+                        setError('Email already exists. Switch to Login and continue.');
+                        switchAuthView('login');
+                        const emailInput = document.getElementById('auth-email');
+                        if (emailInput) emailInput.value = email;
+                    } else if (methods && methods.includes('google.com')) {
+                        setError('This email is registered with Google. Click “Continue with Google” to sign in. We can link your password after.');
+                        pendingLink = { email, password, provider: 'google.com' };
+                    } else {
+                        setError(mapAuthError(e, 'signup'));
+                    }
+                } catch (mErr) {
+                    console.warn('fetchSignInMethodsForEmail failed', mErr);
+                    setError(mapAuthError(e, 'signup'));
+                }
+            } else {
+                setError(mapAuthError(e, 'signup'));
+            }
         }
     }
 
@@ -186,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await auth.signInWithEmailAndPassword(email, password);
         } catch (e) {
             console.error('Sign in failed:', e);
-            setError(e && e.message ? e.message : 'Sign in failed');
+            setError(mapAuthError(e, 'login'));
         }
     }
 
@@ -211,13 +357,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (userInfo) show(userInfo);
                 if (guestInfo) hide(guestInfo);
                 if (userEmailEl) userEmailEl.textContent = user.email || '';
-                switchView('dashboard');
+                const wantDashboard = appState.forcedStartView === 'dashboard';
+                switchView(wantDashboard ? 'dashboard' : 'dashboard');
                 renderDashboard();
                 // Load streak/timer and resume last course
                 loadStreak();
                 restoreTimerState();
-                const localCourse = loadFromLocal(LS_KEYS.lastCourse);
-                if (localCourse) loadCourse(localCourse);
+                // Skip auto-resume when URL forces dashboard view
+                if (appState.forcedStartView !== 'dashboard') {
+                    const localCourse = loadFromLocal(LS_KEYS.lastCourse);
+                    if (localCourse) loadCourse(localCourse);
+                }
+                // Clean URL once routed
+                try {
+                    const params = new URLSearchParams(location.search);
+                    if (params.get('view')) {
+                        params.delete('view');
+                        const next = location.pathname + (params.toString() ? ('?' + params.toString()) : '') + location.hash;
+                        window.history.replaceState(null, '', next);
+                    }
+                } catch (_) {}
             } else {
                 // UI for logged-out
                 show(authModal);
@@ -225,6 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (userInfo) hide(userInfo);
                 if (guestInfo) show(guestInfo);
                 switchAuthView('login');
+                // If URL requested dashboard, keep generator hidden until login, then we'll route to dashboard
                 switchView('generator');
             }
         });
@@ -312,10 +472,72 @@ document.addEventListener('DOMContentLoaded', () => {
             setError('');
             try {
                 const provider = new firebase.auth.GoogleAuthProvider();
-                await auth.signInWithPopup(provider);
+                const result = await auth.signInWithPopup(provider);
+                // If user attempted to sign up with password for a Google account, link it now
+                if (pendingLink && result?.user && result.user.email === pendingLink.email) {
+                    try {
+                        const cred = firebase.auth.EmailAuthProvider.credential(pendingLink.email, pendingLink.password);
+                        await result.user.linkWithCredential(cred);
+                        pendingLink = null;
+                        setError('Password linked to your Google account. You can use email/password next time.');
+                    } catch (linkErr) {
+                        console.warn('Link password failed:', linkErr);
+                        setError(mapAuthError(linkErr, 'signup'));
+                    }
+                }
             } catch (err) {
                 console.error('Google sign-in failed', err);
-                setError('Google sign-in failed');
+                setError(mapAuthError(err, 'login'));
+            }
+        });
+    }
+
+    // Forgot password handler with cooldown
+    const forgotBtn = document.getElementById('auth-forgot');
+    if (forgotBtn && auth) {
+        const resetCooldown = { until: 0, timerId: null, baseText: forgotBtn.textContent || 'Forgot password?' };
+        function startResetCooldown(seconds = 60) {
+            if (resetCooldown.timerId) { clearInterval(resetCooldown.timerId); resetCooldown.timerId = null; }
+            resetCooldown.until = Date.now() + seconds * 1000;
+            forgotBtn.disabled = true;
+            const tick = () => {
+                const leftMs = resetCooldown.until - Date.now();
+                if (leftMs <= 0) {
+                    clearInterval(resetCooldown.timerId);
+                    resetCooldown.timerId = null;
+                    forgotBtn.disabled = false;
+                    forgotBtn.textContent = resetCooldown.baseText;
+                    return;
+                }
+                const left = Math.ceil(leftMs / 1000);
+                forgotBtn.textContent = `Resend in ${left}s`;
+            };
+            tick();
+            resetCooldown.timerId = setInterval(tick, 250);
+        }
+
+        forgotBtn.addEventListener('click', async () => {
+            setError('');
+            const now = Date.now();
+            if (now < resetCooldown.until) {
+                const left = Math.ceil((resetCooldown.until - now) / 1000);
+                setError(`Please wait ${left}s before requesting another reset email.`);
+                return;
+            }
+            const email = document.getElementById('auth-email')?.value?.trim();
+            if (!email) {
+                setError('Enter your email above, then click “Forgot password?” again.');
+                const emailInput = document.getElementById('auth-email');
+                emailInput && emailInput.focus();
+                return;
+            }
+            try {
+                await auth.sendPasswordResetEmail(email);
+                setError('Password reset email sent. Check your inbox.');
+                startResetCooldown(60);
+            } catch (err) {
+                console.error('Reset email failed', err);
+                setError(mapAuthError(err, 'login'));
             }
         });
     }
@@ -1087,6 +1309,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function tick() {
         if (!appState.timer.isRunning) return;
         appState.timer.timeLeft -= 1;
+        if (appState.timer.mode === 'work') {
+            try { addStudySeconds(1); } catch (_) {}
+        }
         if (appState.timer.timeLeft <= 0) {
             // Auto-switch modes
             appState.timer.mode = appState.timer.mode === 'work' ? 'break' : 'work';
@@ -1137,6 +1362,17 @@ document.addEventListener('DOMContentLoaded', () => {
         saveTimerState();
     }
 
+    // Initialize "Hours Today" from stored study seconds on load
+    try {
+        const s = (function(){
+            const data = loadFromLocal(LS_KEYS.study) || {};
+            const key = (function(){ const d = new Date(); const y=d.getFullYear(); const m=(d.getMonth()+1).toString().padStart(2,'0'); const day=d.getDate().toString().padStart(2,'0'); return `${y}-${m}-${day}`; })();
+            return { sec: typeof data[key] === 'number' ? data[key] : 0 };
+        })();
+        updateStudyHoursUI(s.sec);
+        updateWeeklyHoursStat();
+    } catch(_){}
+
     // Day Streak
     function todayKey() {
         const d = new Date();
@@ -1154,7 +1390,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const snap = await ref.get();
                 if (snap.exists) {
                     const data = snap.data() || {};
-                    document.getElementById('stat-streak').textContent = `${data.count || 0} 🔥`;
+                    const count = data.count || 0;
+                    const stat = document.getElementById('stat-streak');
+                    if (stat) stat.textContent = `${count} 🔥`;
+                    const countEl = document.getElementById('streak-count');
+                    if (countEl) countEl.textContent = String(count);
+                    const disp = document.getElementById('streak-display');
+                    if (disp) disp.classList.toggle('glowing', count > 0);
                     saveToLocal(LS_KEYS.streak, data);
                     return;
                 }
@@ -1162,7 +1404,13 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (_) {}
         // Fallback to local
         const local = loadFromLocal(LS_KEYS.streak) || { count: 0, last: null };
-        document.getElementById('stat-streak').textContent = `${local.count || 0} 🔥`;
+        const count = local.count || 0;
+        const stat = document.getElementById('stat-streak');
+        if (stat) stat.textContent = `${count} 🔥`;
+        const countEl = document.getElementById('streak-count');
+        if (countEl) countEl.textContent = String(count);
+        const disp = document.getElementById('streak-display');
+        if (disp) disp.classList.toggle('glowing', count > 0);
     }
 
     async function bumpStreak() {
@@ -1175,13 +1423,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 const prev = new Date(current.last);
                 const now = new Date(t);
                 const diffDays = Math.round((now - prev) / (1000 * 60 * 60 * 24));
+                const prevCount = current.count;
                 current.count = diffDays === 1 ? (current.count + 1) : 1;
+                if (current.count > prevCount) {
+                    // Celebrate bump
+                    showToast({ title: `Streak ${current.count}!`, text: 'New day, keep it going.', icon: '🔥' });
+                }
             } else {
+                const prevCount = current.count;
                 current.count = 1;
+                if (current.count > prevCount) {
+                    showToast({ title: `Streak ${current.count}!`, text: 'First day—nice start.', icon: '🔥' });
+                }
             }
             current.last = t;
             saveToLocal(LS_KEYS.streak, current);
-            document.getElementById('stat-streak').textContent = `${current.count} 🔥`;
+            const stat = document.getElementById('stat-streak');
+            if (stat) stat.textContent = `${current.count} 🔥`;
+            const countEl = document.getElementById('streak-count');
+            if (countEl) countEl.textContent = String(current.count);
+            const disp = document.getElementById('streak-display');
+            if (disp) disp.classList.toggle('glowing', current.count > 0);
             // Persist to Firestore best-effort
             try {
                 if (db && appState.user) {
@@ -1191,7 +1453,90 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (_) {}
         }
     }
+
+    // Increment/reset streak based on calendar-day visit (no lesson required)
+    async function updateStreakOnVisit() {
+        try {
+            const t = todayKey();
+            let current = loadFromLocal(LS_KEYS.streak) || { count: 0, last: null };
+            if (current.last === t) {
+                // already recorded today; just ensure UI reflects stored value
+            } else {
+                if (current.last) {
+                    const prev = new Date(current.last);
+                    const now = new Date(t);
+                    const diffDays = Math.round((now - prev) / (1000 * 60 * 60 * 24));
+                    const prevCount = current.count;
+                    current.count = (diffDays === 1) ? (current.count + 1) : 1;
+                    if (current.count > prevCount) {
+                        showToast({ title: `Streak ${current.count}!`, text: 'Daily streak rolled over.', icon: '🔥' });
+                    }
+                } else {
+                    const prevCount = current.count;
+                    current.count = 1;
+                    if (current.count > prevCount) {
+                        showToast({ title: `Streak ${current.count}!`, text: 'First day—nice start.', icon: '🔥' });
+                    }
+                }
+                current.last = t;
+                saveToLocal(LS_KEYS.streak, current);
+                // best-effort sync
+                try {
+                    if (db && appState.user) {
+                        const ref = db.collection('users').doc(appState.user.uid).collection('meta').doc('streak');
+                        await ref.set({ count: current.count, last: current.last }, { merge: true });
+                    }
+                } catch (_) {}
+            }
+            // Update UI either way
+            const stat = document.getElementById('stat-streak');
+            if (stat) stat.textContent = `${current.count || 0} 🔥`;
+            const countEl = document.getElementById('streak-count');
+            if (countEl) countEl.textContent = String(current.count || 0);
+            const disp = document.getElementById('streak-display');
+            if (disp) disp.classList.toggle('glowing', (current.count || 0) > 0);
+        } catch (_) { /* non-fatal */ }
+    }
+
+    // Initialize and roll streak on visit so it doesn't stick at 1
+    try { updateStreakOnVisit(); } catch (_) {}
+    try { loadStreak(); } catch (_) {}
     function renderActivityChart() { /* noop */ }
     // Auth diagnostics removed
+
+    // --- Notes Feature (toggle, load, save) ---
+    (function initNotesFeature(){
+        const notesContainer = document.getElementById('notesContainer');
+        const toggleBtn = document.getElementById('toggleNotesBtn');
+        const saveBtn = document.getElementById('saveNotesBtn');
+        const notesArea = document.getElementById('userNotes');
+        if (!toggleBtn || !notesContainer) return;
+
+        // Hidden by default via CSS; ensure consistent state
+        notesContainer.classList.remove('visible');
+
+        // Load notes on init
+        try {
+            const saved = localStorage.getItem('userNotes');
+            if (saved != null && notesArea) notesArea.value = saved;
+        } catch(_) {}
+
+        toggleBtn.addEventListener('click', () => {
+            notesContainer.classList.toggle('visible');
+        });
+
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                try {
+                    const val = (notesArea?.value || '');
+                    localStorage.setItem('userNotes', val);
+                    // simple feedback
+                    const prev = saveBtn.textContent;
+                    saveBtn.textContent = 'Saved!';
+                    setTimeout(()=>{ saveBtn.textContent = prev; }, 1500);
+                } catch(_) {}
+            });
+        }
+    })();
 });
 

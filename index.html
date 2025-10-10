@@ -3,11 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IntelliCourse - AI Learning Platform</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+        <title>IntelliCourse - AI Learning Platform</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="style.css">
+        <style>
+            :root {
+                --bg: #111827;
+                --bg-soft: #0B1220;
+                --card: #0F172A;
+                --text: #E5E7EB;
+                --muted: #9CA3AF;
+                --accent: #10B981; /* emerald-500 */
+                --accent-600: #059669;
+                --ring: rgba(16, 185, 129, 0.35);
+            }
+
+            /* Landing reset + base */
+            .ic-landing { font-family: 'Poppins', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; color: var(--text); background: radial-gradient(1200px 600px at 80% -10%, rgba(16,185,129,.15), transparent 50%), var(--bg); min-height: 100vh; }
+            .ic-container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 1.25rem; }
+            .ic-accent { color: var(--accent); }
+            .ic-muted { color: var(--muted); }
+            .ic-grad-text { background: linear-gradient(90deg, #34D399, #10B981 40%, #6EE7B7 80%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+            /* Header */
+            .ic-header { position: sticky; top: 0; z-index: 40; background: rgba(11,18,32,0.6); backdrop-filter: saturate(140%) blur(10px); border-bottom: 1px solid rgba(255,255,255,0.06); }
+            .ic-nav { display: flex; align-items: center; justify-content: space-between; padding: 0.9rem 0; }
+            .ic-logo { display: flex; align-items: center; gap: .6rem; font-weight: 700; letter-spacing: .2px; font-size: 1.05rem; }
+            .ic-logo-mark { width: 28px; height: 28px; border-radius: 8px; background: conic-gradient(from 160deg, #065F46, #10B981, #34D399, #10B981); box-shadow: 0 0 0 3px rgba(16,185,129,.15), 0 10px 30px rgba(16,185,129,.25) inset; }
+            .ic-nav-actions { display: flex; align-items: center; gap: .6rem; }
+            .ic-btn { appearance: none; border: 1px solid rgba(255,255,255,0.14); color: var(--text); background: rgba(255,255,255,0.02); padding: .55rem .9rem; border-radius: .65rem; font-weight: 500; letter-spacing: .2px; transition: all .2s ease; cursor: pointer; }
+            .ic-btn:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.22); }
+            .ic-btn-ghost { border-color: rgba(255,255,255,0.12); color: #CBD5E1; background: transparent; }
+            .ic-btn-ghost:hover { color: var(--text); background: rgba(255,255,255,0.07); }
+            .ic-btn-accent { background: var(--accent); border-color: var(--accent); color: #061510; box-shadow: 0 6px 24px rgba(16,185,129,.35); }
+            .ic-btn-accent:hover { background: var(--accent-600); border-color: var(--accent-600); box-shadow: 0 8px 26px rgba(5,150,105,.45); }
+
+            /* Hero */
+            .ic-hero { padding: 5.5rem 0 3rem; }
+            .ic-hero-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 2.5rem; align-items: center; }
+            .ic-eyebrow { display: inline-flex; align-items: center; gap: .5rem; padding: .35rem .6rem; border: 1px solid rgba(16,185,129,.35); color: #A7F3D0; background: rgba(16,185,129,.07); border-radius: 999px; font-size: .75rem; font-weight: 600; letter-spacing: .28px; }
+            .ic-hero-title { font-size: clamp(2rem, 3.8vw + .5rem, 3.4rem); line-height: 1.05; font-weight: 700; letter-spacing: -.02em; margin: .9rem 0 1.1rem; }
+            .ic-hero-sub { font-size: clamp(.98rem, .5vw + .6rem, 1.08rem); color: var(--muted); max-width: 56ch; }
+            .ic-cta-row { display: flex; align-items: center; gap: .8rem; margin-top: 1.5rem; }
+            .ic-cta-subtle { font-size: .9rem; color: #93C5FD; }
+            .ic-visual { position: relative; }
+            .ic-visual-card { position: relative; border-radius: 16px; background: linear-gradient(180deg, rgba(15,23,42,.9), rgba(2,6,23,.9)); border: 1px solid rgba(255,255,255,.06); padding: 1rem; box-shadow: 0 30px 80px rgba(0,0,0,.45); }
+            .ic-visual-inner { width: 100%; height: 340px; border-radius: 12px; background: #0A0F1B; border: 1px solid rgba(255,255,255,.08); display: block; object-fit: cover; }
+            .ic-visual-ring { position: absolute; inset: -18px; border-radius: 22px; pointer-events: none; border: 1px solid rgba(16,185,129,.18); filter: blur(.2px); }
+
+            /* Features */
+            .ic-section { padding: 3.5rem 0 4rem; }
+            .ic-section-title { font-size: clamp(1.6rem, 1.5vw + .9rem, 2rem); font-weight: 700; letter-spacing: -.01em; margin-bottom: 1.2rem; }
+            .ic-features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+            .ic-feature { background: linear-gradient(180deg, rgba(16,20,30,.9), rgba(9,13,22,.9)); border: 1px solid rgba(255,255,255,.06); border-radius: 14px; padding: 1.25rem; box-shadow: 0 18px 40px rgba(0,0,0,.35); }
+            .ic-feature h3 { font-size: 1.05rem; margin: .6rem 0 .35rem; }
+            .ic-icon-wrap { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; background: rgba(16,185,129,.12); color: var(--accent); border: 1px solid rgba(16,185,129,.35); }
+            .ic-feature p { color: var(--muted); font-size: .95rem; line-height: 1.6; }
+
+            /* Footer */
+            .ic-footer { border-top: 1px solid rgba(255,255,255,0.06); background: rgba(11,18,32,0.5); }
+            .ic-footer .ic-container { padding-top: 1.2rem; padding-bottom: 1.2rem; }
+
+            /* Scroll reveal */
+            .reveal { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease; }
+            .reveal-visible { opacity: 1; transform: translateY(0); }
+
+            /* Responsive */
+            @media (max-width: 1024px) {
+                .ic-hero { padding-top: 4.5rem; }
+                .ic-hero-grid { grid-template-columns: 1fr; }
+                .ic-visual-inner { height: 280px; }
+            }
+            @media (max-width: 768px) {
+                .ic-nav { padding: .7rem 0; }
+                .ic-cta-row { flex-direction: column; align-items: flex-start; }
+                .ic-features { grid-template-columns: 1fr; }
+            }
+        </style>
     <!-- Inline favicon to avoid 404 requests for /favicon.ico -->
     <link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="%236B8A7A"/></svg>'>
     <!-- Firebase (compat) scripts for app.js Firestore/Auth code -->
@@ -15,8 +89,99 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore-compat.js"></script>
 
+    <style>
+        /* Prevent landing flicker when deep-linking to dashboard */
+        .no-landing #landing { display: none !important; }
+    </style>
+    <script>
+        (function(){
+            try {
+                var params = new URLSearchParams(location.search);
+                if ((params.get('view')||'').toLowerCase() === 'dashboard') {
+                    document.documentElement.classList.add('no-landing');
+                }
+            } catch (e) {}
+        })();
+    </script>
  </head>
  <body class="antialiased">
+
+        <!-- Landing Page -->
+        <div id="landing" class="ic-landing">
+            <header class="ic-header">
+                <div class="ic-container ic-nav">
+                    <div class="ic-logo">
+                        <span class="ic-logo-mark" aria-hidden="true"></span>
+                        <span>IntelliCourse</span>
+                    </div>
+                    <div class="ic-nav-actions">
+                        <button id="nav-login-btn" class="ic-btn ic-btn-ghost" type="button">Login</button>
+                        <button id="nav-signup-btn" class="ic-btn ic-btn-accent" type="button">Sign Up</button>
+                    </div>
+                </div>
+            </header>
+
+            <main>
+                <section class="ic-hero">
+                    <div class="ic-container ic-hero-grid">
+                        <div class="reveal">
+                            <span class="ic-eyebrow">AI Course Generator</span>
+                            <h1 class="ic-hero-title">
+                                The <span class="ic-grad-text">Future of Learning</span> is here. Build your perfect course with AI.
+                            </h1>
+                            <p class="ic-hero-sub">Stop searching, start learning. Describe any topic, and our AI will instantly generate a complete course curriculum for you, with videos, quizzes, and projects.</p>
+                            <div class="ic-cta-row">
+                                <button id="hero-cta" class="ic-btn ic-btn-accent" type="button">Start Learning for Free</button>
+                                <span class="ic-cta-subtle">No credit card required</span>
+                            </div>
+                        </div>
+                                    <div class="ic-visual reveal" aria-hidden="true">
+                                        <div class="ic-visual-card">
+                                            <video class="ic-visual-inner" autoplay muted loop playsinline>
+                                                <source src="./IntelliCourse_Promotional_Video_Generation.mp4" type="video/mp4" />
+                                            </video>
+                                            <span class="ic-visual-ring"></span>
+                                        </div>
+                                    </div>
+                    </div>
+                </section>
+
+                <section class="ic-section">
+                    <div class="ic-container">
+                        <h2 class="ic-section-title reveal">Everything you need to learn, in one place</h2>
+                        <div class="ic-features">
+                            <article class="ic-feature reveal">
+                                <div class="ic-icon-wrap">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a1 1 0 0 1 .894.553l2.618 5.297 5.846.849a1 1 0 0 1 .554 1.706l-4.232 4.126.998 5.82a1 1 0 0 1-1.452 1.054L12 19.771l-5.226 2.734A1 1 0 0 1 5.322 20.6l.998-5.82-4.232-4.126a1 1 0 0 1 .554-1.706l5.846-.849L11.106 2.553A1 1 0 0 1 12 2Z"/></svg>
+                                </div>
+                                <h3>AI-Powered Curriculum</h3>
+                                <p>Personalized, structured content tailored to your goals and skill level—generated in seconds.</p>
+                            </article>
+                            <article class="ic-feature reveal">
+                                <div class="ic-icon-wrap">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 3a2 2 0 0 0-2 2v10.5A3.5 3.5 0 0 0 6.5 19H19a2 2 0 0 0 2-2V7.5A3.5 3.5 0 0 0 17.5 4H6.5A1.5 1.5 0 0 1 5 2v1Zm6 5h2v6h-2V8Zm-4 2h2v4H7v-4Zm8-3h2v7h-2V7Z"/></svg>
+                                </div>
+                                <h3>Gamified Experience</h3>
+                                <p>Stay motivated with streaks, focus timers, and progress tracking that make learning addictive.</p>
+                            </article>
+                            <article class="ic-feature reveal">
+                                <div class="ic-icon-wrap">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 6a3 3 0 0 1 3-3h5v6H3V6Zm10-3h5a3 3 0 0 1 3 3v3h-8V3Zm8 8v7a3 3 0 0 1-3 3h-5v-10h8ZM3 11h8v10H6a3 3 0 0 1-3-3v-7Z"/></svg>
+                                </div>
+                                <h3>All-in-One Platform</h3>
+                                <p>Watch videos, take notes, and quiz yourself—all from a single, streamlined workspace.</p>
+                            </article>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <footer class="ic-footer">
+                <div class="ic-container">
+                    <p class="ic-muted">&copy; 2025 IntelliCourse. All rights reserved.</p>
+                </div>
+            </footer>
+        </div>
 
     <!-- Auth Modal -->
     <div id="auth-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
@@ -46,6 +211,9 @@
                         <div class="relative">
                             <input type="password" id="auth-password" class="w-full border rounded-lg px-3 py-2 pr-10 focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition text-sm" required autocomplete="current-password" />
                             <span id="password-strength" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400"></span>
+                        </div>
+                        <div class="flex justify-end mt-1">
+                            <button type="button" id="auth-forgot" class="text-xs text-emerald-500 hover:text-emerald-400">Forgot password?</button>
                         </div>
                     </div>
                     <p id="auth-error" class="text-red-500 text-xs min-h-[1rem]"></p>
@@ -172,6 +340,7 @@
                             <div class="sticky top-24 tool-stack">
                                 <div class="tool-card">
                                     <h3 class="subtle-label">Focus Timer</h3>
+                                    <svg id="toggleNotesBtn" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-edit"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                     <div class="timer-face" id="timer-display">25:00</div>
                                     <div class="flex items-center gap-2 mt-3">
                                         <button type="button" id="timer-settings-btn" class="btn-icon" title="Timer Settings" aria-label="Timer Settings">
@@ -191,11 +360,35 @@
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <!-- Notes Container (hidden by default) -->
+                                <div id="notesContainer" class="card" style="padding:1rem;">
+                                    <h4 class="subtle-label" style="margin:0 0 .5rem;">My Notes</h4>
+                                    <textarea id="userNotes" placeholder="Write your notes here..."></textarea>
+                                    <button id="saveNotesBtn" type="button" class="btn btn-primary" style="margin-top:.75rem;">Save Notes</button>
+                                </div>
                                 <div class="tool-card">
-                                    <h3 class="subtle-label">Day Streak</h3>
-                                    <div class="flex items-end gap-3">
-                                        <div class="timer-face leading-none text-[2.75rem]" id="streak-counter">0</div>
-                                        <span class="text-xl">🔥</span>
+                                    <div class="day-streak-container">
+                                        <div id="streak-display" class="streak-circle">
+                                            <div class="streak-content">
+                                                <span id="streak-count">0</span>
+                                                <svg class="flame-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 23.5c-3.47 0-6.27-2.8-6.27-6.27 0-3.47 2.8-6.27 6.27-6.27s6.27 2.8 6.27 6.27c0 3.47-2.8 6.27-6.27 6.27zm0-11.54c-2.9 0-5.25 2.35-5.25 5.25s2.35 5.25 5.25 5.25 5.25-2.35 5.25-5.25-2.35-5.25-5.25-5.25z"/><path d="M12 1.5c-3.1 0-5.62 2.52-5.62 5.62 0 2.15 1.22 4.02 3 4.94.33-1.03.88-2.02 1.62-2.9.52-.61 1.13-1.15 1.8-1.58.67-.43 1.38-.7 2.1-.82-.12-.39-.2-.8-.2-1.22C14.5.5 12 1.5 12 1.5z" transform="translate(0 -1.5)"/></svg>
+                                            </div>
+                                        </div>
+                                        <div class="daily-stats-info">
+                                            <div class="hours-display" aria-label="Hours studied today">
+                                                <div class="hours-icon" aria-hidden="true">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                                </div>
+                                                <div class="hours-text">
+                                                    <span id="study-hours" class="hours-value">2.5h</span>
+                                                    <span class="hours-label">Hours Today</span>
+                                                </div>
+                                            </div>
+                                            <a href="todo.html" class="add-todo-link" title="Add To-do">
+                                                <svg id="add-todo-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="tool-card">
@@ -248,6 +441,15 @@
                             <div class="stat-body">
                                 <p class="subtle-label tracking-[.12em]">Current Streak</p>
                                 <p id="stat-streak" class="stat-value">0 🔥</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background:rgba(16,185,129,0.12); color:#10B981;">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                            </div>
+                            <div class="stat-body">
+                                <p class="subtle-label tracking-[.12em]">Hours This Week</p>
+                                <p id="stat-weekly-hours" class="stat-value">0h</p>
                             </div>
                         </div>
                     </div>
@@ -350,6 +552,80 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+        <script>
+            // Navbar and CTA interactions: open auth modal and set correct tab
+            (function() {
+                const $ = (sel, root=document) => root.querySelector(sel);
+                const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+                const authModal = document.getElementById('auth-modal');
+                const loginBtn = document.getElementById('nav-login-btn');
+                const signupBtn = document.getElementById('nav-signup-btn');
+                const heroCta = document.getElementById('hero-cta');
+
+                        function showAuth(which) {
+                    if (!authModal) return;
+                            authModal.classList.remove('hidden');
+
+                    // Toggle tab buttons if present
+                    const tabs = $$('.tab-btn', authModal);
+                    tabs.forEach(btn => {
+                        const isActive = btn.dataset.tab === which;
+                        btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                        // Harmonize with existing Tailwind classes used in index.html modal
+                        if (isActive) {
+                            btn.classList.add('bg-slate-100','text-slate-800');
+                            btn.classList.remove('bg-slate-50','text-slate-600');
+                        } else {
+                            btn.classList.remove('bg-slate-100','text-slate-800');
+                            btn.classList.add('bg-slate-50','text-slate-600');
+                        }
+                    });
+
+                    // Update primary button label based on tab
+                    const submit = document.getElementById('auth-submit');
+                    if (submit) {
+                        const label = submit.querySelector('.submit-label');
+                        if (label) label.textContent = which === 'signup' ? 'Create Account' : 'Continue';
+                    }
+
+                            // Set form mode for app.js submit handler
+                            const form = document.getElementById('auth-form');
+                            if (form) form.dataset.mode = which;
+                }
+
+                loginBtn?.addEventListener('click', () => showAuth('login'));
+                signupBtn?.addEventListener('click', () => showAuth('signup'));
+                heroCta?.addEventListener('click', () => showAuth('signup'));
+
+                // Scroll reveal animations
+                        const revealEls = $$('.reveal');
+                const io = new IntersectionObserver((entries) => {
+                    entries.forEach(e => {
+                        if (e.isIntersecting) {
+                            e.target.classList.add('reveal-visible');
+                            io.unobserve(e.target);
+                        }
+                    });
+                }, { threshold: 0.2 });
+                revealEls.forEach(el => io.observe(el));
+
+                        // Hide landing when the in-app UI is active (user signed in)
+                        const landing = document.getElementById('landing');
+                        const appContent = document.getElementById('app-content');
+                        if (landing && appContent) {
+                            const updateLanding = () => {
+                                const appVisible = !appContent.classList.contains('hidden');
+                                landing.style.display = appVisible ? 'none' : 'block';
+                            };
+                            // Initial state
+                            updateLanding();
+                            // Observe class changes
+                            const mo = new MutationObserver(updateLanding);
+                            mo.observe(appContent, { attributes: true, attributeFilter: ['class'] });
+                        }
+            })();
+        </script>
+        <script src="app.js"></script>
 </body>
 </html>
