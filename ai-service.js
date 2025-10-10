@@ -3,13 +3,18 @@
 // Load environment variables from .env (GEMINI_API_KEY)
 require('dotenv').config();
 
-// Google Generative AI SDK
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+// Google Generative AI SDK (guarded import for environments where ESM-only packages break require)
+let GoogleGenerativeAI;
+try {
+    ({ GoogleGenerativeAI } = require('@google/generative-ai'));
+} catch (e) {
+    console.warn('[GenAI] SDK load failed (non-fatal). Falling back to sample data. Details:', e?.message || e);
+}
 
 // Instantiate client with API key
 const API_KEY = process.env.GEMINI_API_KEY;
 const MODEL_OVERRIDE = process.env.GEMINI_MODEL; // optional manual override
-const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
+const genAI = (API_KEY && GoogleGenerativeAI) ? new GoogleGenerativeAI(API_KEY) : null;
 // YouTube Data API key (optional but recommended) - support both env names
 const YT_API_KEY = process.env.YT_API_KEY || process.env.YOUTUBE_API_KEY;
 // Allow disabling enrichment in production if quota is tight
@@ -118,6 +123,7 @@ function normalizeModelName(name) {
 }
 
 async function testModelName(modelName, prompt) {
+    if (!genAI) throw new Error('GenAI client unavailable');
     const name = normalizeModelName(modelName);
     const model = genAI.getGenerativeModel({ model: name });
     const result = await model.generateContent(prompt);
@@ -128,6 +134,10 @@ async function testModelName(modelName, prompt) {
 
 // Helper: try a list of models until one works, or throw last error
 async function generateWithFirstAvailableModel(prompt) {
+    if (!genAI) {
+        // No client available (SDK missing or API key absent) -> let caller hit fallback path
+        throw new Error('GenAI client unavailable');
+    }
     // Try manual override first
     if (MODEL_OVERRIDE) {
         try {
