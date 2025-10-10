@@ -85,7 +85,16 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 // Serve static front-end files (index.html etc.)
-app.use(express.static(path.join(__dirname)));
+// Serve static front-end files; disable caching for html/css/js to avoid stale UI on redeploys
+app.use(express.static(path.join(__dirname), {
+  setHeaders: (res, filePath) => {
+    if (/\.(html|css|js|map|json)$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 
 // Root - serve the UI
 app.get('/', (_req, res) => {

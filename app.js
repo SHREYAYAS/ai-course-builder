@@ -379,12 +379,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch (_) {}
             } else {
                 // UI for logged-out
-                show(authModal);
+                hide(authModal); // keep modal closed by default on first load
                 hide(appContent);
                 if (userInfo) hide(userInfo);
                 if (guestInfo) show(guestInfo);
-                switchAuthView('login');
-                // If URL requested dashboard, keep generator hidden until login, then we'll route to dashboard
+                // Do not force modal; user can open Login/Sign Up from landing navbar
+                // If URL requested dashboard, we'll route there after login
                 switchView('generator');
             }
         });
