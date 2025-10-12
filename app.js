@@ -27,11 +27,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const yt = j.youtube || {};
                 const backoffActive = yt.backoffUntil && Date.now() < yt.backoffUntil;
                 const noKey = j && j.youtubeKeyLoaded === false;
-                if (banner && (!yt.enrichEnabled || backoffActive || noKey)) {
+                const disabled = yt && yt.enrichEnabled === false;
+                if (banner && (disabled || backoffActive || noKey)) {
                     const when = backoffActive ? ` until ${new Date(yt.backoffUntil).toLocaleTimeString()}` : '';
                     const msg = noKey
                         ? 'Videos are disabled on this deployment (no YouTube API key configured).'
-                        : 'Some lessons may not include videos right now due to YouTube API limits' + when + '.';
+                        : disabled
+                            ? 'Videos are disabled on this deployment (YT_ENRICH=false). Enable YT_ENRICH or remove it to restore video search.'
+                            : 'Some lessons may not include videos right now due to YouTube API limits' + when + '.';
                     banner.textContent = msg;
                     banner.classList.remove('hidden');
                 }
@@ -1178,6 +1181,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const markCompleteBtn = document.getElementById('mark-complete-btn');
         const videoContainer = document.getElementById('video-container');
         document.getElementById('lesson-title').textContent = lesson.title || '';
+        // Client-side safety net: assign a fallback video if missing/invalid
+        try {
+            const isValidId = (id) => typeof id === 'string' && /^[\w-]{11}$/.test(id);
+            if (!isValidId(lesson.videoId)) {
+                const defaults = ['kqtD5dpn9C8', 'PkZNo7MFNFg', 'sBws8MSXN7A'];
+                const pick = defaults[(moduleIndex * 7 + lessonIndex) % defaults.length];
+                lesson.videoId = pick;
+                // Persist to local snapshot so refresh keeps the fallback
+                try { saveToLocal(LS_KEYS.lastCourse, course); } catch (_) {}
+            }
+        } catch (_) {}
         if (lesson.videoId && lesson.videoId !== 'null') {
             videoContainer.innerHTML = `<iframe id="video-player" class="w-full h-full" src="https://www.youtube.com/embed/${lesson.videoId}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
         } else {
