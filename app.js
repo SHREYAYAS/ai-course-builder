@@ -21,14 +21,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!r.ok) throw new Error(`Health status ${r.status}`);
             const j = await r.json();
             console.log('Backend health:', j);
-            // Update YouTube banner if enrichment is disabled or in backoff
+            // Update YouTube banner if enrichment is disabled, key missing, or in backoff
             try {
                 const banner = document.getElementById('yt-banner');
                 const yt = j.youtube || {};
                 const backoffActive = yt.backoffUntil && Date.now() < yt.backoffUntil;
-                if (banner && (!yt.enrichEnabled || backoffActive)) {
+                const noKey = j && j.youtubeKeyLoaded === false;
+                if (banner && (!yt.enrichEnabled || backoffActive || noKey)) {
                     const when = backoffActive ? ` until ${new Date(yt.backoffUntil).toLocaleTimeString()}` : '';
-                    banner.textContent = 'Some lessons may not include videos right now due to YouTube API limits' + when + '.';
+                    const msg = noKey
+                        ? 'Videos are disabled on this deployment (no YouTube API key configured).'
+                        : 'Some lessons may not include videos right now due to YouTube API limits' + when + '.';
+                    banner.textContent = msg;
                     banner.classList.remove('hidden');
                 }
             } catch (_) {}

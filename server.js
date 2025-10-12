@@ -104,7 +104,8 @@ app.get('/', (_req, res) => {
 // Health + diagnostics
 app.get('/health', (_req, res) => {
   const hasKey = !!process.env.GEMINI_API_KEY;
-  const hasYT = !!process.env.YT_API_KEY;
+  // Accept either env var name for YouTube key (matches ai-service.js)
+  const hasYT = !!(process.env.YT_API_KEY || process.env.YOUTUBE_API_KEY);
   const yt = (getYouTubeStatus && getYouTubeStatus()) || {};
   res.json({
     status: 'ok',

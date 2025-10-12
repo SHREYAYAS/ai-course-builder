@@ -95,6 +95,23 @@ async function enrichCourseWithYouTube(course, topic) {
     return course;
 }
 
+// Ensure each lesson has some playable videoId even if enrichment or AI didn't provide one
+function ensureLessonVideos(course) {
+    try {
+        const defaults = ['kqtD5dpn9C8', 'PkZNo7MFNFg', 'sBws8MSXN7A'];
+        let i = 0;
+        for (const module of course.modules || []) {
+            for (const lesson of module.lessons || []) {
+                if (!isValidVideoId(lesson.videoId)) {
+                    lesson.videoId = defaults[i % defaults.length];
+                    i++;
+                }
+            }
+        }
+    } catch (_) {}
+    return course;
+}
+
 // --- Gemini model discovery (REST) ---
 let discoveredModelsCache = null;
 let lastWorkingModel = null; // remember the last model that worked this session
@@ -320,8 +337,9 @@ async function generateCourseWithAI(topic, options = {}) {
         if (!courseData.id) {
             courseData.id = `course-${Date.now()}`;
         }
-        // Optionally replace/verify videoIds with real YouTube results
-        return await enrichCourseWithYouTube(courseData, topic);
+    // Optionally replace/verify videoIds with real YouTube results
+    const enriched = await enrichCourseWithYouTube(courseData, topic);
+    return ensureLessonVideos(enriched);
 
     } catch (error) {
         console.error('Error communicating with Gemini:', error?.status || '', error?.statusText || '', String(error));
@@ -337,7 +355,8 @@ async function generateCourseWithAI(topic, options = {}) {
 
     // Fallback sample so the app remains usable for demos
     const course = fallbackCourse(topic);
-    return await enrichCourseWithYouTube(course, topic);
+    const enriched = await enrichCourseWithYouTube(course, topic);
+    return ensureLessonVideos(enriched);
     }
 }
 
