@@ -279,6 +279,13 @@
                                 <span>Generate</span>
                             </button>
                         </div>
+                        <div class="mt-3">
+                            <button id="customize-course-btn-hero" type="button" class="btn btn-secondary customize-course-trigger">Customize Course</button>
+                        </div>
+                        <div id="customize-summary" class="customize-summary mt-2" aria-live="polite">
+                            <span id="customize-summary-text">Default: Beginner · Short</span>
+                            <button type="button" id="customize-change-link" class="link-muted">Change</button>
+                        </div>
                     </div>
                     <div id="loading-indicator" class="mt-10 hidden">
                         <div class="center gap-3">
@@ -354,9 +361,11 @@
                                     </div>
                                     <div id="timer-customization" class="hidden mt-4 text-left">
                                         <label for="custom-time-input" class="subtle-label">Custom Minutes</label>
-                                        <div class="input-group input-group-compact mt-2 max-w-[220px]">
-                                            <input id="custom-time-input" type="number" min="1" step="1" placeholder="Minutes" />
-                                            <button id="set-time-btn" class="btn btn-secondary" type="button">Set</button>
+                                        <div class="input-row mt-2" style="max-width: 320px;">
+                                            <div class="input-group input-group-compact" style="flex:1 1 auto; min-width:0;">
+                                                <input id="custom-time-input" type="number" min="1" step="1" placeholder="Minutes" style="width:100%;" />
+                                            </div>
+                                            <button id="set-time-btn" class="btn btn-secondary" type="button" style="white-space:nowrap;">Set</button>
                                         </div>
                                     </div>
                                 </div>
@@ -395,7 +404,7 @@
                                     <h3 class="subtle-label">Course Management</h3>
                                     <div class="flex flex-col gap-2 mt-2">
                                         <button class="btn btn-premium w-full">Upgrade to Premium</button>
-                                        <button id="customize-course-btn" type="button" class="btn btn-secondary w-full">Customize Course</button>
+                                        <button id="customize-course-btn" type="button" class="btn btn-secondary w-full customize-course-trigger">Customize Course</button>
                                     </div>
                                 </div>
                             </div>

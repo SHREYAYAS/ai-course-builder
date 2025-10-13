@@ -906,6 +906,10 @@ document.addEventListener('DOMContentLoaded', () => {
     tabButtons.projects.addEventListener('click', () => switchTab('projects'));
     // Customize Course Modal logic (simplified with direct id)
     const customizeCourseBtn = document.getElementById('customize-course-btn');
+    const customizeCourseBtnHero = document.getElementById('customize-course-btn-hero');
+    const customizeSummaryEl = document.getElementById('customize-summary');
+    const customizeSummaryText = document.getElementById('customize-summary-text');
+    const customizeChangeLink = document.getElementById('customize-change-link');
     const customizeModal = document.getElementById('customize-modal');
     const customizeOverlay = document.getElementById('customize-overlay');
     const customizeClose = document.getElementById('customize-close');
@@ -1103,22 +1107,41 @@ document.addEventListener('DOMContentLoaded', () => {
         customizeOverlay?.classList.add('hidden');
         customizeModal?.classList.add('hidden');
     }
+    // Attach to both triggers (sidebar + hero area)
     if (customizeCourseBtn) customizeCourseBtn.addEventListener('click', openCustomize);
+    if (customizeCourseBtnHero) customizeCourseBtnHero.addEventListener('click', openCustomize);
+    if (customizeChangeLink) customizeChangeLink.addEventListener('click', openCustomize);
     customizeClose?.addEventListener('click', closeCustomize);
     customizeCancel?.addEventListener('click', closeCustomize);
     customizeOverlay?.addEventListener('click', (e) => { if (e.target === customizeOverlay) closeCustomize(); });
     customizeForm?.addEventListener('submit', (e) => {
         e.preventDefault();
         const fd = new FormData(customizeForm);
-        const difficulty = fd.get('difficulty');
-        const length = fd.get('length');
+        const difficulty = fd.get('difficulty') || 'beginner';
+        const length = fd.get('length') || 'short';
         console.log('Customize selections:', { difficulty, length });
         appState.customization = { difficulty, length, ts: Date.now() };
         // Persist locally so next session retains last choice
         saveToLocal('intelli:customization', appState.customization);
+        // Update summary text under generator
+        if (customizeSummaryText) {
+            const cap = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1);
+            customizeSummaryText.textContent = `${cap(difficulty)} · ${cap(length)}`;
+        }
         closeCustomize();
         // Placeholder: hook into generation logic later if needed
     });
+
+    // Initialize summary from saved customization on load
+    (function initCustomizeSummary(){
+        const saved = appState.customization || loadFromLocal('intelli:customization') || null;
+        if (saved && customizeSummaryText) {
+            const cap = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1);
+            const d = saved.difficulty || 'beginner';
+            const l = saved.length || 'short';
+            customizeSummaryText.textContent = `${cap(d)} · ${cap(l)}`;
+        }
+    })();
     document.getElementById('syllabus-container').addEventListener('click', (e) => {
         const lessonItem = e.target.closest('.lesson-item');
         if (!lessonItem || !appState.currentCourse) return;
@@ -1157,8 +1180,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="flex-grow font-medium tracking-tight">${lesson.title}</span>
                     </li>`;
             }).join('');
+            const moduleTitle = module && module.title ? String(module.title) : `Module ${moduleIndex + 1}`;
             moduleEl.innerHTML = `
-                <h3 class="font-bold text-md mb-2 px-2">${module.title}</h3>
+                <h3 class="font-bold text-md mb-2 px-2">${moduleTitle}</h3>
                 <ul class="space-y-1">${lessonsHtml}</ul>
             `;
             container.appendChild(moduleEl);

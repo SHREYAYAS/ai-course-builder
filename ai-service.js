@@ -29,18 +29,53 @@ function isValidVideoId(id) {
     return typeof id === 'string' && /^[\w-]{11}$/.test(id);
 }
 
-async function fetchYouTubeVideoId(searchQuery) {
+// Convert ISO 8601 duration to seconds (e.g., PT15M33S -> 933)
+function isoToSeconds(iso) {
+    if (!iso || typeof iso !== 'string') return 0;
+    const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!m) return 0;
+    const h = parseInt(m[1] || '0', 10);
+    const min = parseInt(m[2] || '0', 10);
+    const s = parseInt(m[3] || '0', 10);
+    return h * 3600 + min * 60 + s;
+}
+
+async function validateYouTubeCandidates(ids, prefs = {}) {
+    if (!YT_API_KEY || !ids || !ids.length) return null;
+    const url = `https://www.googleapis.com/youtube/v3/videos?` + new URLSearchParams({
+        part: 'status,contentDetails,snippet',
+        id: ids.join(','),
+        key: YT_API_KEY,
+    }).toString();
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const minSeconds = prefs.minSeconds ?? 180; // >= 3 min
+    const maxSeconds = prefs.maxSeconds ?? 3600; // <= 60 min
+    for (const item of data.items || []) {
+        const st = item.status || {};
+        const cd = item.contentDetails || {};
+        const dur = isoToSeconds(cd.duration || '');
+        const ok = st.embeddable !== false && st.privacyStatus === 'public' && dur >= minSeconds && dur <= maxSeconds;
+        if (ok) return item.id;
+    }
+    return null;
+}
+
+async function fetchYouTubeVideoId(searchQuery, prefs = {}) {
     if (!YT_API_KEY) return null;
     if (Date.now() < ytQuotaBackoffUntil) return null;
+    const duration = prefs.videoDuration || 'medium'; // default to 4-20 minutes to avoid shorts
     const params = new URLSearchParams({
         part: 'snippet',
         q: searchQuery,
         type: 'video',
-        maxResults: '1',
+        maxResults: '5',
         key: YT_API_KEY,
         videoEmbeddable: 'true',
         safeSearch: 'moderate',
-        videoDuration: 'short', // try to keep lessons concise
+        videoDuration: duration,
+        videoDefinition: 'high',
         regionCode: 'US',
         relevanceLanguage: 'en'
     });
@@ -64,11 +99,17 @@ async function fetchYouTubeVideoId(searchQuery) {
         return null;
     }
     const data = await res.json();
-    const item = data.items?.[0];
-    return item?.id?.videoId || null;
+    const items = Array.isArray(data.items) ? data.items : [];
+    const candidates = items.map(i => i?.id?.videoId).filter(Boolean);
+    // Validate candidates for embeddable/public and duration
+    const validated = await validateYouTubeCandidates(candidates, {
+        minSeconds: prefs.videoDuration === 'short' ? 60 : 180,
+        maxSeconds: prefs.videoDuration === 'long' ? 7200 : 3600,
+    });
+    return validated || candidates[0] || null;
 }
 
-async function enrichCourseWithYouTube(course, topic) {
+async function enrichCourseWithYouTube(course, topic, prefs = {}) {
     if (!YT_ENRICH || !YT_API_KEY) return course; // disabled or no key
     if (Date.now() < ytQuotaBackoffUntil) return course; // backoff in effect
     // Sequential (low-concurrency) to avoid quota spikes
@@ -76,14 +117,15 @@ async function enrichCourseWithYouTube(course, topic) {
         for (const lesson of module.lessons || []) {
             // Skip if AI already provided a valid videoId
             if (isValidVideoId(lesson.videoId)) continue;
-            const q = `${topic} ${lesson.title} tutorial`;
+            const suffix = prefs.querySuffix || 'long form tutorial';
+            const q = `${topic} ${lesson.title} ${suffix}`.trim();
             if (ytCache.has(q)) {
                 const cached = ytCache.get(q);
                 if (cached) lesson.videoId = cached;
                 continue;
             }
             try {
-                const vid = await fetchYouTubeVideoId(q);
+                const vid = await fetchYouTubeVideoId(q, { videoDuration: prefs.videoDuration || 'medium' });
                 ytCache.set(q, vid);
                 if (vid) lesson.videoId = vid;
                 if (Date.now() < ytQuotaBackoffUntil) return course; // stop early if quota hit
@@ -108,6 +150,28 @@ function ensureLessonVideos(course) {
                 }
             }
         }
+    } catch (_) {}
+    return course;
+}
+
+// Normalize and sanitize course structure (titles, arrays)
+function sanitizeCourseStructure(course) {
+    try {
+        if (!course || typeof course !== 'object') return course;
+        if (!Array.isArray(course.modules)) course.modules = [];
+        course.modules.forEach((m, mi) => {
+            if (!m || typeof m !== 'object') { course.modules[mi] = { title: `Module ${mi+1}`, lessons: [] }; return; }
+            if (!m.title) m.title = `Module ${mi + 1}`;
+            if (!Array.isArray(m.lessons)) m.lessons = [];
+            m.lessons.forEach((l, li) => {
+                if (!l || typeof l !== 'object') { m.lessons[li] = { title: `Lesson ${li+1}`, videoId: 'null', type:'free', completed:false, notes:'' }; return; }
+                if (!l.title) l.title = `Lesson ${li + 1}`;
+                if (typeof l.completed !== 'boolean') l.completed = false;
+                if (!('videoId' in l)) l.videoId = 'null';
+                if (!l.type) l.type = mi === 0 && li < 2 ? 'free' : 'paid';
+                if (!l.notes) l.notes = '';
+            });
+        });
     } catch (_) {}
     return course;
 }
@@ -337,8 +401,12 @@ async function generateCourseWithAI(topic, options = {}) {
         if (!courseData.id) {
             courseData.id = `course-${Date.now()}`;
         }
-    // Optionally replace/verify videoIds with real YouTube results
-    const enriched = await enrichCourseWithYouTube(courseData, topic);
+        // Sanitize structure and optionally replace/verify videoIds with real YouTube results
+        sanitizeCourseStructure(courseData);
+        // Choose a preferred duration based on requested length
+        const desiredDuration = (length === 'short') ? 'short' : (length === 'medium' ? 'medium' : 'medium');
+        const prefs = { videoDuration: desiredDuration, querySuffix: (length === 'long') ? 'full tutorial lecture' : 'tutorial long form' };
+        const enriched = await enrichCourseWithYouTube(courseData, topic, prefs);
     return ensureLessonVideos(enriched);
 
     } catch (error) {
@@ -355,7 +423,8 @@ async function generateCourseWithAI(topic, options = {}) {
 
     // Fallback sample so the app remains usable for demos
     const course = fallbackCourse(topic);
-    const enriched = await enrichCourseWithYouTube(course, topic);
+    sanitizeCourseStructure(course);
+    const enriched = await enrichCourseWithYouTube(course, topic, { videoDuration: 'medium', querySuffix:'tutorial long form' });
     return ensureLessonVideos(enriched);
     }
 }
