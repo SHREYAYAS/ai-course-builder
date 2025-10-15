@@ -19,6 +19,11 @@ const genAI = (API_KEY && GoogleGenerativeAI) ? new GoogleGenerativeAI(API_KEY) 
 const YT_API_KEY = process.env.YT_API_KEY || process.env.YOUTUBE_API_KEY;
 // Allow disabling enrichment in production if quota is tight
 const YT_ENRICH = String(process.env.YT_ENRICH || 'true').toLowerCase() !== 'false';
+// Optional: boost specific channels (comma-separated channel IDs) e.g., UC8butISFwT-Wl7EV0hUK0BQ
+const YT_PREFERRED_CHANNEL_IDS = (process.env.YT_PREFERRED_CHANNEL_IDS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
 
 // Simple in-memory cache and quota backoff flag
 const ytCache = new Map(); // key: query -> videoId|null
@@ -40,10 +45,29 @@ function isoToSeconds(iso) {
     return h * 3600 + min * 60 + s;
 }
 
+// Heuristic scoring to rank accepted candidates (higher is better)
+function scoreVideo(item, prefs = {}) {
+    const cd = item.contentDetails || {};
+    const sn = item.snippet || {};
+    const st = item.statistics || {};
+    const dur = isoToSeconds(cd.duration || '');
+    const viewCount = parseInt(st.viewCount || '0', 10);
+    // Duration target by preference
+    let target = 900; // ~15m default
+    if (prefs.videoDuration === 'long') target = 4500; // ~75m sweet spot
+    else if (prefs.videoDuration === 'short') target = 600; // ~10m
+    const durPenalty = Math.min(10, Math.abs(dur - target) / Math.max(1, target) * 6);
+    const title = (sn.title || '').toLowerCase();
+    const titleBonus = /(full (course|tutorial)|deep dive|lecture|workshop|masterclass)/.test(title) ? 4 : 0;
+    const channelBonus = (Array.isArray(prefs.preferredChannels) && prefs.preferredChannels.includes(sn.channelId)) ? 8 : 0;
+    const viewsScore = Math.log10(Math.max(1, viewCount + 1));
+    return channelBonus + titleBonus + viewsScore - durPenalty;
+}
+
 async function validateYouTubeCandidates(ids, prefs = {}) {
     if (!YT_API_KEY || !ids || !ids.length) return null;
     const url = `https://www.googleapis.com/youtube/v3/videos?` + new URLSearchParams({
-        part: 'status,contentDetails,snippet',
+        part: 'status,contentDetails,snippet,statistics',
         id: ids.join(','),
         key: YT_API_KEY,
     }).toString();
@@ -52,61 +76,88 @@ async function validateYouTubeCandidates(ids, prefs = {}) {
     const data = await res.json();
     const minSeconds = prefs.minSeconds ?? 180; // >= 3 min
     const maxSeconds = prefs.maxSeconds ?? 3600; // <= 60 min
+    const accepted = [];
     for (const item of data.items || []) {
         const st = item.status || {};
         const cd = item.contentDetails || {};
+        const sn = item.snippet || {};
         const dur = isoToSeconds(cd.duration || '');
-        const ok = st.embeddable !== false && st.privacyStatus === 'public' && dur >= minSeconds && dur <= maxSeconds;
-        if (ok) return item.id;
+        const isPublic = st.privacyStatus === 'public';
+        const embeddable = st.embeddable !== false;
+        const notLive = (sn.liveBroadcastContent || 'none') === 'none';
+        const cr = cd.contentRating || {};
+        const ageOk = cr.ytRating !== 'ytAgeRestricted';
+        const rr = cd.regionRestriction || {};
+        // Prefer videos without regionRestriction; if present, avoid ones with blocked list (best-effort)
+        const noRegionBlock = !rr.blocked || (Array.isArray(rr.blocked) && rr.blocked.length === 0);
+        const withinDuration = dur >= minSeconds && dur <= maxSeconds;
+        const ok = isPublic && embeddable && notLive && ageOk && noRegionBlock && withinDuration;
+        if (ok) accepted.push(item);
     }
-    return null;
+    if (!accepted.length) return null;
+    accepted.sort((a, b) => scoreVideo(b, { ...prefs, preferredChannels: prefs.preferredChannels || YT_PREFERRED_CHANNEL_IDS }) - scoreVideo(a, { ...prefs, preferredChannels: prefs.preferredChannels || YT_PREFERRED_CHANNEL_IDS }));
+    return accepted[0].id;
 }
 
 async function fetchYouTubeVideoId(searchQuery, prefs = {}) {
     if (!YT_API_KEY) return null;
     if (Date.now() < ytQuotaBackoffUntil) return null;
-    const duration = prefs.videoDuration || 'medium'; // default to 4-20 minutes to avoid shorts
-    const params = new URLSearchParams({
-        part: 'snippet',
-        q: searchQuery,
-        type: 'video',
-        maxResults: '5',
-        key: YT_API_KEY,
-        videoEmbeddable: 'true',
-        safeSearch: 'moderate',
-        videoDuration: duration,
-        videoDefinition: 'high',
-        regionCode: 'US',
-        relevanceLanguage: 'en'
-    });
-    const url = `https://www.googleapis.com/youtube/v3/search?${params.toString()}`;
-    const res = await fetch(url);
-    if (!res.ok) {
-        let msgText = res.statusText;
-        try {
-            const j = await res.json();
-            msgText = JSON.stringify(j);
-            // Detect quota exceeded and back off for 1 hour
-            const reason = j?.error?.errors?.[0]?.reason || j?.error?.errors?.[0]?.message || '';
-            if (res.status === 403 && /quota/i.test(JSON.stringify(j))) {
-                ytQuotaBackoffUntil = Date.now() + 60 * 60 * 1000; // 1 hour backoff
-                console.warn('YouTube quota exceeded. Disabling enrichment for 1 hour.');
+    async function searchOnce(durationPref) {
+        const params = new URLSearchParams({
+            part: 'snippet',
+            q: searchQuery,
+            type: 'video',
+            maxResults: '15',
+            key: YT_API_KEY,
+            videoEmbeddable: 'true',
+            videoSyndicated: 'true',
+            safeSearch: 'moderate',
+            videoDuration: durationPref,
+            videoDefinition: 'high',
+            regionCode: 'US',
+            relevanceLanguage: 'en'
+        });
+        const url = `https://www.googleapis.com/youtube/v3/search?${params.toString()}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+            let msgText = res.statusText;
+            try {
+                const j = await res.json();
+                msgText = JSON.stringify(j);
+                if (res.status === 403 && /quota/i.test(JSON.stringify(j))) {
+                    ytQuotaBackoffUntil = Date.now() + 60 * 60 * 1000; // 1 hour backoff
+                    console.warn('YouTube quota exceeded. Disabling enrichment for 1 hour.');
+                }
+            } catch (_) {
+                try { msgText = await res.text(); } catch(_) {}
             }
-        } catch (_) {
-            try { msgText = await res.text(); } catch(_) {}
+            console.warn('YouTube API error:', res.status, msgText);
+            return null;
         }
-        console.warn('YouTube API error:', res.status, msgText);
-        return null;
+        const data = await res.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+        const candidates = items
+            .filter(i => (i?.snippet?.liveBroadcastContent || 'none') === 'none')
+            .map(i => i?.id?.videoId)
+            .filter(Boolean);
+        if (!candidates.length) return null;
+        const validated = await validateYouTubeCandidates(candidates, {
+            minSeconds: durationPref === 'short' ? 60 : (durationPref === 'long' ? 1200 : 180),
+            maxSeconds: durationPref === 'long' ? 7200 : 3600,
+            videoDuration: durationPref,
+            preferredChannels: YT_PREFERRED_CHANNEL_IDS,
+        });
+        return validated; // do not fall back to unvalidated
     }
-    const data = await res.json();
-    const items = Array.isArray(data.items) ? data.items : [];
-    const candidates = items.map(i => i?.id?.videoId).filter(Boolean);
-    // Validate candidates for embeddable/public and duration
-    const validated = await validateYouTubeCandidates(candidates, {
-        minSeconds: prefs.videoDuration === 'short' ? 60 : 180,
-        maxSeconds: prefs.videoDuration === 'long' ? 7200 : 3600,
-    });
-    return validated || candidates[0] || null;
+
+    const preferred = prefs.videoDuration || 'medium';
+    const order = preferred === 'long' ? ['long', 'medium', 'any'] : (preferred === 'short' ? ['short', 'medium', 'any'] : ['medium', 'short', 'any']);
+    for (const dur of order) {
+        const vid = await searchOnce(dur);
+        if (vid) return vid;
+        if (Date.now() < ytQuotaBackoffUntil) return null; // bail if quota hit mid-way
+    }
+    return null;
 }
 
 async function enrichCourseWithYouTube(course, topic, prefs = {}) {
@@ -117,20 +168,26 @@ async function enrichCourseWithYouTube(course, topic, prefs = {}) {
         for (const lesson of module.lessons || []) {
             // Skip if AI already provided a valid videoId
             if (isValidVideoId(lesson.videoId)) continue;
-            const suffix = prefs.querySuffix || 'long form tutorial';
-            const q = `${topic} ${lesson.title} ${suffix}`.trim();
-            if (ytCache.has(q)) {
-                const cached = ytCache.get(q);
-                if (cached) lesson.videoId = cached;
-                continue;
-            }
-            try {
-                const vid = await fetchYouTubeVideoId(q, { videoDuration: prefs.videoDuration || 'medium' });
-                ytCache.set(q, vid);
-                if (vid) lesson.videoId = vid;
-                if (Date.now() < ytQuotaBackoffUntil) return course; // stop early if quota hit
-            } catch (e) {
-                console.warn('YT fetch failed for', q, e?.message || e);
+            const suffixes = Array.isArray(prefs.querySuffixList) && prefs.querySuffixList.length
+                ? prefs.querySuffixList
+                : [prefs.querySuffix || 'tutorial', 'full course', 'deep dive', 'lecture', 'workshop', 'masterclass'];
+            let found = false;
+            for (const suffix of suffixes) {
+                const q = `${topic} ${lesson.title} ${suffix}`.trim();
+                const cacheKey = `${q}|${prefs.videoDuration || 'any'}`;
+                if (ytCache.has(cacheKey)) {
+                    const cached = ytCache.get(cacheKey);
+                    if (cached) { lesson.videoId = cached; found = true; break; }
+                    continue;
+                }
+                try {
+                    const vid = await fetchYouTubeVideoId(q, { videoDuration: prefs.videoDuration || 'medium' });
+                    ytCache.set(cacheKey, vid);
+                    if (vid) { lesson.videoId = vid; found = true; break; }
+                    if (Date.now() < ytQuotaBackoffUntil) return course; // stop early if quota hit
+                } catch (e) {
+                    console.warn('YT fetch failed for', q, e?.message || e);
+                }
             }
         }
     }
@@ -312,6 +369,12 @@ async function generateCourseWithAI(topic, options = {}) {
     }[difficulty] || difficultyGuidance?.beginner;
 
     // This is the "prompt" - the detailed instructions we give to the AI
+    const videoLengthGuidance = {
+        short: 'Prefer concise videos under 10–15 minutes when possible.',
+        medium: 'Prefer videos around 10–30 minutes when possible.',
+        long: 'Prefer long-form videos in the 20–120 minute range (lectures, full tutorials) when possible.'
+    }[length] || 'Prefer videos under 20 minutes when possible.';
+
     const prompt = `
         You are an expert course creator. Your task is to generate a complete, JSON-formatted course curriculum about a given topic.
         Topic: "${topic}".
@@ -325,9 +388,9 @@ async function generateCourseWithAI(topic, options = {}) {
         Respect these sizing targets as closely as possible.
 
         For EACH lesson provide:
-        For each lesson, you must provide:
+    For each lesson, you must provide:
         1. A concise 'title'.
-        2. A valid YouTube video ID for a relevant, high-quality tutorial video. The video should be from a reputable source and be less than 20 minutes long if possible. Provide only the 11-character video ID.
+    2. A valid YouTube video ID for a relevant, high-quality tutorial video. The video should be from a reputable source. ${videoLengthGuidance} Provide only the 11-character video ID.
         3. A 'type' which can be either 'free' or 'paid'. Make the first 1-2 lessons in the first module 'free' and the rest 'paid'.
         4. AI-generated 'notes' in simple HTML format (using <p>, <h3>, <h4>, <ul>, <li>, <b> tags) that summarize the key points of the lesson topic. The notes should be comprehensive enough for a beginner to understand.
 
@@ -404,8 +467,8 @@ async function generateCourseWithAI(topic, options = {}) {
         // Sanitize structure and optionally replace/verify videoIds with real YouTube results
         sanitizeCourseStructure(courseData);
         // Choose a preferred duration based on requested length
-        const desiredDuration = (length === 'short') ? 'short' : (length === 'medium' ? 'medium' : 'medium');
-        const prefs = { videoDuration: desiredDuration, querySuffix: (length === 'long') ? 'full tutorial lecture' : 'tutorial long form' };
+    const desiredDuration = (length === 'short') ? 'short' : (length === 'medium' ? 'medium' : 'long');
+    const prefs = { videoDuration: desiredDuration, querySuffixList: (length === 'long') ? ['full course','deep dive lecture','long form tutorial','workshop','masterclass'] : ['tutorial','hands-on tutorial','crash course','guide'] };
         const enriched = await enrichCourseWithYouTube(courseData, topic, prefs);
     return ensureLessonVideos(enriched);
 
@@ -424,7 +487,7 @@ async function generateCourseWithAI(topic, options = {}) {
     // Fallback sample so the app remains usable for demos
     const course = fallbackCourse(topic);
     sanitizeCourseStructure(course);
-    const enriched = await enrichCourseWithYouTube(course, topic, { videoDuration: 'medium', querySuffix:'tutorial long form' });
+    const enriched = await enrichCourseWithYouTube(course, topic, { videoDuration: (options?.length || 'short').toLowerCase() === 'long' ? 'long' : ((options?.length || 'short').toLowerCase() === 'medium' ? 'medium' : 'short'), querySuffix: (options?.length || 'short').toLowerCase() === 'long' ? 'full tutorial lecture long form' : 'tutorial' });
     return ensureLessonVideos(enriched);
     }
 }

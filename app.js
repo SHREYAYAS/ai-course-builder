@@ -1271,7 +1271,142 @@ document.addEventListener('DOMContentLoaded', () => {
     // Attach timer-related event listeners now that all elements & helper vars exist
     (function initTimerUI(){
         const editVideoBtn = document.getElementById('edit-video-btn');
-        if (editVideoBtn) editVideoBtn.addEventListener('click', () => {});
+        // Helper: extract 11-char YouTube ID from many URL formats or raw ID
+        function extractYouTubeId(input) {
+            if (!input) return null;
+            const str = String(input).trim();
+            // If it's already a clean 11-char ID
+            if (/^[\w-]{11}$/.test(str)) return str;
+            try {
+                // Normalize short forms like youtu.be/<id>
+                // and long forms like youtube.com/watch?v=<id>&...
+                const url = new URL(str.includes('://') ? str : `https://${str}`);
+                const host = url.hostname.replace(/^www\./,'');
+                // shorts/<id> or live/<id> or embed/<id>
+                const pathParts = url.pathname.split('/').filter(Boolean);
+                if (host === 'youtu.be' && pathParts[0]) return pathParts[0].slice(0,11);
+                if (host.endsWith('youtube.com')) {
+                    const v = url.searchParams.get('v');
+                    if (v && /^[\w-]{11}$/.test(v)) return v;
+                    const known = ['shorts','embed','live'];
+                    if (pathParts.length >= 2 && known.includes(pathParts[0]) && /^[\w-]{11}$/.test(pathParts[1])) {
+                        return pathParts[1];
+                    }
+                }
+            } catch (_) {}
+            return null;
+        }
+
+        // Modal-based Edit Video UI
+        const editVideo = {
+            overlay: document.getElementById('edit-video-overlay'),
+            modal: document.getElementById('edit-video-modal'),
+            input: document.getElementById('edit-video-input'),
+            preview: document.getElementById('edit-video-preview'),
+            close: document.getElementById('edit-video-close'),
+            save: document.getElementById('edit-video-save'),
+            revert: document.getElementById('edit-video-revert'),
+            prevId: null,
+        };
+
+        function updateEditVideoPreview(raw) {
+            const id = extractYouTubeId(raw);
+            if (id) {
+                if (editVideo.preview) {
+                    editVideo.preview.innerHTML = `
+                        <div style="display:flex;gap:12px;align-items:center;">
+                            <img src="https://img.youtube.com/vi/${id}/hqdefault.jpg" alt="Video thumbnail" style="width:180px;height:auto;border-radius:6px;border:1px solid #ddd;" />
+                            <div>
+                                <div style="color:#16a34a;font-weight:600;">ID: ${id}</div>
+                                <small style="color:#666;">Preview image only. Ensure the selected video is embeddable.</small>
+                            </div>
+                        </div>`;
+                }
+                if (editVideo.input) editVideo.input.dataset.valid = 'true';
+            } else {
+                if (editVideo.preview) editVideo.preview.innerHTML = '<div style="color:#b45309;">Enter a valid YouTube URL or 11-char ID.</div>';
+                if (editVideo.input) editVideo.input.dataset.valid = 'false';
+            }
+        }
+
+        function openEditVideoModal() {
+            if (!appState.currentCourse || !appState.currentCourse.activeLesson) {
+                alert('Open a lesson first to edit its video.');
+                return;
+            }
+            const { moduleIndex, lessonIndex } = appState.currentCourse.activeLesson;
+            const current = appState.currentCourse.modules?.[moduleIndex]?.lessons?.[lessonIndex] || null;
+            const existing = current && current.videoId && current.videoId !== 'null' ? current.videoId : '';
+            editVideo.prevId = existing || null;
+            if (editVideo.input) editVideo.input.value = existing || '';
+            updateEditVideoPreview(existing || '');
+            editVideo.overlay && editVideo.overlay.classList.remove('hidden');
+            editVideo.modal && editVideo.modal.classList.remove('hidden');
+            if (editVideo.input) setTimeout(() => editVideo.input.focus(), 0);
+        }
+
+        function closeEditVideoModal() {
+            editVideo.overlay && editVideo.overlay.classList.add('hidden');
+            editVideo.modal && editVideo.modal.classList.add('hidden');
+        }
+
+        // Wire modal events
+        if (editVideo.input) editVideo.input.addEventListener('input', (e) => updateEditVideoPreview(e.target.value));
+        if (editVideo.close) editVideo.close.addEventListener('click', closeEditVideoModal);
+        if (editVideo.overlay) editVideo.overlay.addEventListener('click', closeEditVideoModal);
+        if (editVideo.save) editVideo.save.addEventListener('click', async () => {
+            if (!appState.currentCourse || !appState.currentCourse.activeLesson) return;
+            const { moduleIndex, lessonIndex } = appState.currentCourse.activeLesson;
+            const id = extractYouTubeId(editVideo.input ? editVideo.input.value : '');
+            if (!id) { alert('Please enter a valid YouTube URL or 11-character ID.'); return; }
+            try {
+                appState.currentCourse.modules[moduleIndex].lessons[lessonIndex].videoId = id;
+                appState.currentCourse.updatedAt = new Date().toISOString();
+                if (db && appState.user && appState.currentCourse.id) {
+                    try {
+                        const ref = db.collection('users').doc(appState.user.uid).collection('courses').doc(String(appState.currentCourse.id));
+                        await ref.set({ modules: appState.currentCourse.modules, updatedAt: appState.currentCourse.updatedAt }, { merge: true });
+                    } catch (e) {
+                        console.warn('Failed to persist edited videoId to Firestore:', e);
+                    }
+                }
+                saveToLocal(LS_KEYS.lastCourse, appState.currentCourse);
+                loadLesson(appState.currentCourse, moduleIndex, lessonIndex);
+                try { showToast({ title: 'Video updated', text: 'The lesson video was changed.', icon: '🎬' }); } catch (_) {}
+            } catch (e) {
+                console.error('Failed to update lesson video:', e);
+                alert('Could not update the video link.');
+            } finally {
+                closeEditVideoModal();
+            }
+        });
+        if (editVideo.revert) editVideo.revert.addEventListener('click', async () => {
+            if (!appState.currentCourse || !appState.currentCourse.activeLesson) return;
+            if (!editVideo.prevId) { alert('No previous video to revert to.'); return; }
+            const { moduleIndex, lessonIndex } = appState.currentCourse.activeLesson;
+            try {
+                appState.currentCourse.modules[moduleIndex].lessons[lessonIndex].videoId = editVideo.prevId;
+                appState.currentCourse.updatedAt = new Date().toISOString();
+                if (db && appState.user && appState.currentCourse.id) {
+                    try {
+                        const ref = db.collection('users').doc(appState.user.uid).collection('courses').doc(String(appState.currentCourse.id));
+                        await ref.set({ modules: appState.currentCourse.modules, updatedAt: appState.currentCourse.updatedAt }, { merge: true });
+                    } catch (e) {
+                        console.warn('Failed to persist revert videoId to Firestore:', e);
+                    }
+                }
+                saveToLocal(LS_KEYS.lastCourse, appState.currentCourse);
+                loadLesson(appState.currentCourse, moduleIndex, lessonIndex);
+                try { showToast({ title: 'Reverted', text: 'Restored the previous video for this lesson.', icon: '↩️' }); } catch (_) {}
+            } catch (e) {
+                console.error('Failed to revert lesson video:', e);
+                alert('Could not revert the video link.');
+            } finally {
+                closeEditVideoModal();
+            }
+        });
+
+        if (editVideoBtn) editVideoBtn.addEventListener('click', openEditVideoModal);
         if (startBtn) startBtn.addEventListener('click', startTimer);
         if (pauseBtn) pauseBtn.addEventListener('click', pauseTimer);
         if (resetBtn) resetBtn.addEventListener('click', resetTimer);

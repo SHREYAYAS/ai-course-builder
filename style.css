@@ -398,6 +398,11 @@ footer { border-top: 1px solid var(--line); color: var(--muted); }
 /* Toast notifications */
 .toast-container { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 10px; z-index: 10000; pointer-events: none; }
 .toast { pointer-events: auto; display: flex; align-items: center; gap: 10px; background: rgba(17,24,39,0.95); /* slate-900 */ color: #E5E7EB; /* slate-200 */ border: 1px solid #374151; /* slate-700 */ border-radius: 12px; padding: 10px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.35); transform: translateY(8px); opacity: 0; transition: transform .25s ease, opacity .25s ease; }
+/* Edit Video modal preview helpers */
+.ic-modal-body .thumb-row{display:flex;gap:12px;align-items:center}
+.ic-modal-body .thumb{width:180px;height:auto;border-radius:6px;border:1px solid #ddd}
+.ic-modal-body .thumb-meta .ok{color:#16a34a;font-weight:600}
+.ic-modal-body .warn{color:#b45309}
 .toast.show { transform: translateY(0); opacity: 1; }
 .toast .toast-icon { width: 18px; height: 18px; color: #F59E0B; /* amber-500 */ display: inline-flex; align-items: center; justify-content: center; }
 .toast .toast-title { font-weight: 800; margin-right: 4px; }
